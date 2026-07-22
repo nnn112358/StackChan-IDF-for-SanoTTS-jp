@@ -279,9 +279,15 @@ extern "C" void app_main()
     // 受信ポーズが servo 目標角へ書き込んで動かす (servo タスク自体は通常起動)。
 #if defined(CONFIG_STACKCHAN_ESPNOW_REMOTE_ENABLED)
     const bool espnow_mode = (cfg.operation_mode == stackchan::config::OperationMode::EspNowRemote);
+    const bool espnow_sender_mode =
+        (cfg.operation_mode == stackchan::config::OperationMode::EspNowSender);
 #else
     const bool espnow_mode = false;
+    const bool espnow_sender_mode = false;
 #endif
+    // Receiver / Sender どちらも WiFi 固定チャネル (AP 非接続) なので、STA 接続を
+    // 前提とする httpd / 会話 / wifi_audio / STA 待ちの各処理を等しくスキップする。
+    const bool espnow_any = espnow_mode || espnow_sender_mode;
 
     // Resident camera init (M5Base only; no-op elsewhere / slim builds).
     // Must run after the i2c dump (which uses In_I2C) and before any task
@@ -529,13 +535,19 @@ extern "C" void app_main()
         cfg.openai_enabled = false;
         cfg.jtts_idle_enabled = false;
         break;
+    case stackchan::config::OperationMode::EspNowSender:
+        // ESP-NOW 姿勢配信: 頭部はローカルのアイドル動作が駆動し、その姿勢を
+        // 配信する。会話/独り言は切り、WiFi は固定チャネル。
+        cfg.openai_enabled = false;
+        cfg.jtts_idle_enabled = false;
+        break;
     }
     ESP_LOGI(kTag, "operation_mode=%u (conv=%d jtts_idle=%d asr=%d espnow=%d)",
              static_cast<unsigned>(cfg.operation_mode),
              static_cast<int>(cfg.openai_enabled),
              static_cast<int>(cfg.jtts_idle_enabled),
              static_cast<int>(asr_mode),
-             static_cast<int>(espnow_mode));
+             static_cast<int>(espnow_any));
 
     // SharedState + audio_stream sink must be live BEFORE config::start
     // brings the BLE GATT service online. Otherwise a client that
@@ -614,7 +626,7 @@ extern "C" void app_main()
     // 前提で、AP に繋ぐとチャネルがホップして受信できなくなる。WiFi の初期化は
     // 後段の espnow::start が固定チャネルで行う。httpd も上がらないため HTTP sink
     // 登録も飛ばす (設定は別モードで行う)。
-    if (!espnow_mode) {
+    if (!espnow_any) {
         stackchan::app::wifi_start(cfg);
         // Same sink/getter on the Wi-Fi side. The Wi-Fi service starts on a worker
         // task after Wi-Fi STA gets an IP — the calls below race that; the setters
@@ -689,7 +701,7 @@ extern "C" void app_main()
     // Wi-Fi live audio (RTP/L16 today). Like the BLE sink, mutually exclusive
     // with the conversation backend, so it self-disables when voice chat is on.
 #if CONFIG_STACKCHAN_WIFI_AUDIO_ENABLED
-    if (!espnow_mode) {
+    if (!espnow_any) {
         stackchan::app::wifi_audio::start(*g_state, cfg.openai_enabled, cfg.rtp_audio_enabled);
     }
 #else
@@ -862,6 +874,42 @@ extern "C" void app_main()
                      cfg.espnow_channel, cfg.espnow_receiver_id);
         }
     }
+
+    // ESP-NOW 姿勢配信 (Sender): 自機の現在(指令)姿勢を 50ms 毎に broadcast し、
+    // もう 1 台の EspNowRemote 受信機がミラーする。頭部はローカルのアイドル動作
+    // (demo_loop) が駆動するので external_servo_control は立てない。公式 Sender と
+    // 同じ 50ms 周期・speed=800・laser=0。degree→0.1° 生値 (×10)。
+    if (espnow_sender_mode) {
+        const stackchan::espnow::SenderConfig sc{.channel = cfg.espnow_channel,
+                                                 .target_id = cfg.espnow_receiver_id};
+        if (auto r = stackchan::espnow::start_sender(sc); !r) {
+            ESP_LOGE(kTag, "ESP-NOW sender failed to start: %s", esp_err_to_name(r.error()));
+        } else {
+            ESP_LOGI(kTag, "ESP-NOW pose sender active (channel=%u target=%u)",
+                     cfg.espnow_channel, cfg.espnow_receiver_id);
+            xTaskCreatePinnedToCore(
+                +[](void*) {
+                    for (;;) {
+                        const float yaw_deg =
+                            g_state->servo.target_yaw_deg.load(std::memory_order_relaxed);
+                        const float pitch_deg =
+                            g_state->servo.target_pitch_deg.load(std::memory_order_relaxed);
+                        const auto yaw = static_cast<std::int16_t>(yaw_deg * 10.0f);
+                        const auto pitch = static_cast<std::int16_t>(pitch_deg * 10.0f);
+                        stackchan::espnow::send(yaw, pitch, /*speed=*/800, /*laser=*/0);
+                        static std::int64_t last_log_us = 0;
+                        const std::int64_t now_us = esp_timer_get_time();
+                        if (now_us - last_log_us > 1000000) {
+                            last_log_us = now_us;
+                            ESP_LOGI(kTag, "espnow tx: yaw=%d pitch=%d (%.1f/%.1f deg)", yaw, pitch,
+                                     yaw_deg, pitch_deg);
+                        }
+                        vTaskDelay(pdMS_TO_TICKS(50));
+                    }
+                },
+                "espnow_tx", 4096, nullptr, tskIDLE_PRIORITY + 2, nullptr, 0);
+        }
+    }
 #endif
 
     // The conversation task waits for Wi-Fi internally, then takes over the
@@ -870,7 +918,7 @@ extern "C" void app_main()
     // (no-PSRAM) slim profile drops the whole TLS / WebSocket / assistant
     // PCM ring stack at compile time.
 #if CONFIG_STACKCHAN_CONVERSATION_ENABLED
-    if (!espnow_mode) {
+    if (!espnow_any) {
         stackchan::app::start_conversation_task(*g_conversation_args);
     }
 #else
@@ -888,8 +936,8 @@ extern "C" void app_main()
         // 内部 RAM を断片化させると httpd の 12 KiB 連続ブロック確保が失敗するため
         // (HMM ボイス ロードと同じ理由・下の http_started() 待ち後で生成)。
         ESP_LOGI(kTag, "ASR mode: WakeNet listening (lip-sync skipped; AFE deferred)");
-    } else if (espnow_mode) {
-        // ESP-NOW リモコン モード: 顔と頭部が主役。マイク lip-sync は起動しない。
+    } else if (espnow_any) {
+        // ESP-NOW モード: 頭部が主役。マイク lip-sync は起動しない。
         ESP_LOGI(kTag, "ESP-NOW mode: mic lip-sync skipped (remote drives the head)");
     } else if (!cfg.openai_enabled && !cfg.jtts_idle_enabled) {
         ESP_LOGI(kTag, "mic lip-sync: starting (conversation off, jtts idle off)");
@@ -914,7 +962,7 @@ extern "C" void app_main()
     // Fire the boot event once Wi-Fi has an IP — Claude wants the address +
     // FW version up front, both meaningless before the IP is assigned. Skipped
     // in ESP-NOW mode (no STA association → the waiter would spin forever).
-    if (!espnow_mode)
+    if (!espnow_any)
     xTaskCreatePinnedToCore(
         +[](void* arg) {
             const std::uint8_t kind = *static_cast<std::uint8_t*>(arg);
@@ -1000,7 +1048,7 @@ extern "C" void app_main()
     // 諦めてロード (競合する httpd が無いので問題ない)。
     // ESP-NOW モードは httpd も TTS も使わないので、httpd 待ちもボイス ロードも
     // 飛ばして即 demo_loop へ (顔 + 頭部追従のみ)。
-    if (!espnow_mode) {
+    if (!espnow_any) {
         for (int i = 0; i < 80 && !stackchan::wifi_config::http_started(); ++i) {
             vTaskDelay(pdMS_TO_TICKS(500));
         }

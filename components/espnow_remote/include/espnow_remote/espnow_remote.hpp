@@ -48,4 +48,19 @@ struct ReceiverConfig {
 // バックグラウンドで受信し続ける。
 tl::expected<void, esp_err_t> start(const ReceiverConfig& cfg, PoseHandler on_pose);
 
+struct SenderConfig {
+    std::uint8_t channel = 1;    // 1..13 (受信側と一致必須)
+    std::uint8_t target_id = 0;  // 宛先 receiver id (0 = broadcast, 全受信機がミラー)
+};
+
+// 送信ロール: WiFi(固定チャネル) + ESP-NOW を初期化する (受信も有効なままだが
+// ハンドラ未登録なので破棄される)。以後 send() で 8B ポーズを broadcast できる。
+// start() (受信) と同一チャネルなら内部トランスポートは一度だけ初期化される。
+tl::expected<void, esp_err_t> start_sender(const SenderConfig& cfg);
+
+// 現在姿勢を 1 パケット送出する (target_id は start_sender で設定した値)。
+// 生値は on-wire 単位 (0.1 度想定)。50ms 周期などで呼ぶ。start_sender 前は
+// ESP_ERR_INVALID_STATE。
+esp_err_t send(std::int16_t yaw, std::int16_t pitch, std::int16_t speed, std::uint8_t laser);
+
 }  // namespace stackchan::espnow

@@ -44,6 +44,7 @@ const char* operation_mode_label(OperationMode m)
     case OperationMode::Conversation: return "会話応答";
     case OperationMode::AsrLocal:     return "ローカル音声認識";
     case OperationMode::EspNowRemote: return "ESP-NOWリモコン";
+    case OperationMode::EspNowSender: return "ESP-NOW姿勢配信";
     }
     return "?";
 }
@@ -56,6 +57,7 @@ const char* operation_mode_short(OperationMode m)
     case OperationMode::Conversation: return "conv";
     case OperationMode::AsrLocal:     return "asr";
     case OperationMode::EspNowRemote: return "enow";
+    case OperationMode::EspNowSender: return "esnd";
     }
     return "?";
 }
@@ -74,6 +76,7 @@ constexpr OperationMode kSelectableModes[] = {
 #endif
 #if defined(CONFIG_STACKCHAN_ESPNOW_REMOTE_ENABLED)
     OperationMode::EspNowRemote,
+    OperationMode::EspNowSender,
 #endif
 };
 }  // namespace

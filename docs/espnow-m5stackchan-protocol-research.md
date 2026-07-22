@@ -127,6 +127,26 @@
   `/api/settings`(channel/id/operation-mode)+ `/api/apply` 再起動、または
   BLE/オンデバイス UI で設定してからモード切替(公式のオンデバイス メニュー相当)。
 
+### Sender ロール (自機姿勢配信 / ミラーリング, 2026-07-22 追加・検証済み)
+
+`OperationMode::EspNowSender = 5`。自機の現在(指令)姿勢を 50ms 毎に broadcast し、
+もう 1 台の EspNowRemote 受信機がミラーする(公式 Sender 相当)。
+
+- 頭部は**ローカルのアイドル動作**(demo_loop のランダム ポーズ / なでなで / 会話)
+  が駆動するので `external_servo_control` は立てない(Receiver と逆)。
+- `components/espnow_remote` に `start_sender()` + `send()` を追加。WiFi+esp-now の
+  トランスポート初期化は送受で共有(`ensure_transport`, 一度だけ)。
+- app_main は 4KiB タスクで 50ms 周期に `servo.target_yaw/pitch_deg ×10`(0.1° 生値)
+  を `speed=800`/`laser=0`/`target-id=espnow_receiver_id` で送出。
+- `espnow_receiver_id` は Receiver では自機 ID、Sender では宛先 target-id(0=broadcast)。
+- ネットワーク抑制ガードは `espnow_any = 受信||送信` に一般化(httpd/会話/wifi_audio/
+  STA 待ちを両モードで停止)。
+- **検証**: CoreS3 を Sender(op_mode=5)にして AtomS3 ブリッジで listen →
+  4 秒で ~65 パケット(~20Hz)、`yaw=60 pitch=28 speed=800 laser=0 target-id=1` を
+  公式仕様どおり受信。degree→0.1° 生値の ×10 も一致。
+  (プロビジョニング chicken-and-egg 回避のため一時的に op_mode を上書きした
+   テスト ビルドで確認 → 検証後 AsrLocal に復帰。NVS 選択経路は Receiver と同一)。
+
 ### 残課題(公式リモコン相互運用)
 - 角度単位 0.1° は範囲から確度高いが、**公式実機との厳密な向き/ゼロ点の一致は
   未検証**(手元に対抗機/公式機が無いため)。ブリッジ経由の写像は正確に動作。

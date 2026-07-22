@@ -42,6 +42,9 @@ enum class OperationMode : std::uint8_t {
     EspNowRemote = 4,  // M5Stack 公式 Stack-chan 互換の ESP-NOW リモコン受信 (頭部を遠隔操作)。
                        // WiFi は固定チャネル (AP 非接続) のため httpd/会話は起動しない。
                        // CONFIG_STACKCHAN_ESPNOW_REMOTE_ENABLED の時のみ選択肢に出る。
+    EspNowSender = 5,  // 自機の現在姿勢を ESP-NOW で配信 (もう 1 台の Stack-chan が
+                       // EspNowRemote で受信するとミラーリングする)。頭部はローカルの
+                       // アイドル動作等が駆動する。同じく固定チャネル・httpd/会話なし。
 };
 
 // OperationMode の表示・選択に関する単一の情報源。オンデバイス設定 UI
@@ -236,9 +239,11 @@ struct DeviceConfig {
     // to true, and the migration path in config_store::load preserves any
     // explicit override the user already saved before this field existed).
     OperationMode operation_mode = OperationMode::Conversation;
-    // ESP-NOW リモコン受信 (OperationMode::EspNowRemote) のプロビジョニング。
-    // 送受で一致必須の WiFi チャネル (1–13) と、受信フィルタ用の Receiver ID
-    // (1–254; 送信側 target-id が 0=broadcast か この値に一致する時だけ姿勢を採用)。
+    // ESP-NOW モード (EspNowRemote 受信 / EspNowSender 送信) のプロビジョニング。
+    // 送受で一致必須の WiFi チャネル (1–13) と Receiver ID。ID の意味はロール依存:
+    //   - EspNowRemote(受信): 自機 ID。送信側 target-id が 0=broadcast か この値に
+    //     一致する時だけ姿勢を採用。
+    //   - EspNowSender(送信): 宛先 target-id (0=broadcast で全受信機がミラー)。
     // Staged 設定なので反映は Apply(再起動)後。ESP-NOW モード中は httpd が
     // 上がらないため、これらは別モードの設定画面 (BLE/Web/オンデバイス) で
     // 事前設定してから ESP-NOW モードへ切り替える (公式のオンデバイス メニュー相当)。

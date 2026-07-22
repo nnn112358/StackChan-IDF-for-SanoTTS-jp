@@ -11,6 +11,8 @@
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_wifi.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include <espnow.h>
 #include <espnow_storage.h>
@@ -26,6 +28,14 @@ constexpr const char* kTag = "espnow-rx";
 // ユーザ ポインタを渡せないため、この翻訳単位内の静的で受け渡す)。
 std::uint8_t g_receiver_id = 1;
 PoseHandler g_handler;
+
+// 送信ロールの宛先 id。送信トランスポートが上がっているかのフラグも兼ねる。
+std::uint8_t g_send_target_id = 0;
+bool g_sender_ready = false;
+
+// WiFi + esp-now トランスポートの初期化は送受で共有し、一度だけ行う。
+bool g_transport_up = false;
+int g_transport_channel = 0;
 
 // espressif/esp-now の受信コールバック。ライブラリがフレーム ヘッダを剥がした
 // 8 バイト ペイロードが渡る。target-id フィルタを通ったものだけ g_handler へ。
@@ -76,23 +86,22 @@ tl::expected<void, esp_err_t> wifi_init_fixed_channel(int ch)
     return {};
 }
 
-}  // namespace
-
-tl::expected<void, esp_err_t> start(const ReceiverConfig& cfg, PoseHandler on_pose)
+// WiFi(固定チャネル) + esp-now を一度だけ初期化する (送受で共有)。M5Stack 公式
+// hal_espnow と同一設定 (生パケット互換: forward 無効・data 受信有効)。
+tl::expected<void, esp_err_t> ensure_transport(int ch)
 {
-    const int ch = std::clamp<int>(cfg.channel, 1, 13);
-    g_receiver_id = cfg.receiver_id;
-    g_handler = std::move(on_pose);
-
-    ESP_LOGI(kTag, "ESP-NOW remote receiver: channel=%d receiver_id=%u", ch, g_receiver_id);
-
+    if (g_transport_up) {
+        if (ch != g_transport_channel) {
+            ESP_LOGW(kTag, "transport already up on ch %d; ignoring request for ch %d",
+                     g_transport_channel, ch);
+        }
+        return {};
+    }
     espnow_storage_init();
     if (auto r = wifi_init_fixed_channel(ch); !r) {
         ESP_LOGE(kTag, "wifi init failed: %s", esp_err_to_name(r.error()));
         return r;
     }
-
-    // M5Stack 公式 hal_espnow と同一設定 (生パケット互換: forward 無効・data 受信有効)。
     espnow_config_t ec = ESPNOW_INIT_CONFIG_DEFAULT();
     ec.forward_enable = false;
     ec.forward_switch_channel = false;
@@ -103,12 +112,60 @@ tl::expected<void, esp_err_t> start(const ReceiverConfig& cfg, PoseHandler on_po
         ESP_LOGE(kTag, "espnow_init failed: %s", esp_err_to_name(e));
         return tl::unexpected(e);
     }
+    g_transport_up = true;
+    g_transport_channel = ch;
+    return {};
+}
+
+}  // namespace
+
+tl::expected<void, esp_err_t> start(const ReceiverConfig& cfg, PoseHandler on_pose)
+{
+    const int ch = std::clamp<int>(cfg.channel, 1, 13);
+    g_receiver_id = cfg.receiver_id;
+    g_handler = std::move(on_pose);
+
+    ESP_LOGI(kTag, "ESP-NOW remote receiver: channel=%d receiver_id=%u", ch, g_receiver_id);
+    if (auto r = ensure_transport(ch); !r) return r;
     espnow_set_config_for_data_type(ESPNOW_DATA_TYPE_DATA, true, on_recv);
 
     std::uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_EFUSE_FACTORY);
     ESP_LOGI(kTag, "listening as " MACSTR " on channel %d (id %u)", MAC2STR(mac), ch, g_receiver_id);
     return {};
+}
+
+tl::expected<void, esp_err_t> start_sender(const SenderConfig& cfg)
+{
+    const int ch = std::clamp<int>(cfg.channel, 1, 13);
+    g_send_target_id = cfg.target_id;
+
+    ESP_LOGI(kTag, "ESP-NOW remote sender: channel=%d target_id=%u", ch, g_send_target_id);
+    if (auto r = ensure_transport(ch); !r) return r;
+    g_sender_ready = true;
+
+    std::uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_EFUSE_FACTORY);
+    ESP_LOGI(kTag, "broadcasting as " MACSTR " on channel %d (target %u)", MAC2STR(mac), ch,
+             g_send_target_id);
+    return {};
+}
+
+esp_err_t send(std::int16_t yaw, std::int16_t pitch, std::int16_t speed, std::uint8_t laser)
+{
+    if (!g_sender_ready) return ESP_ERR_INVALID_STATE;
+    std::uint8_t pkt[8];
+    pkt[0] = g_send_target_id;
+    pkt[1] = static_cast<std::uint8_t>(yaw & 0xFF);
+    pkt[2] = static_cast<std::uint8_t>((yaw >> 8) & 0xFF);
+    pkt[3] = static_cast<std::uint8_t>(pitch & 0xFF);
+    pkt[4] = static_cast<std::uint8_t>((pitch >> 8) & 0xFF);
+    pkt[5] = static_cast<std::uint8_t>(speed & 0xFF);
+    pkt[6] = static_cast<std::uint8_t>((speed >> 8) & 0xFF);
+    pkt[7] = laser;
+    espnow_frame_head_t fh = ESPNOW_FRAME_CONFIG_DEFAULT();
+    return espnow_send(ESPNOW_DATA_TYPE_DATA, ESPNOW_ADDR_BROADCAST, pkt, sizeof(pkt), &fh,
+                       pdMS_TO_TICKS(100));
 }
 
 }  // namespace stackchan::espnow
