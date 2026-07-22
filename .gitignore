@@ -41,3 +41,6 @@ node_modules/
 components/jtts/test/host/*.wav
 components/jtts/generated/
 components/jtts/test/host/build/
+
+# Rust BLE CLI build artifacts
+/tools/ble-cli/target/

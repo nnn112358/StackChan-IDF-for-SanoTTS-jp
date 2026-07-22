@@ -502,6 +502,9 @@
     <option value="2">会話応答 (Conversation)</option>
     <option value="1">JTTS ランダム発話 (JttsRandom)</option>
     <option value="0">マイクでリップシンク (MicLipSync)</option>
+    <option value="3">ローカル音声認識 (AsrLocal)</option>
+    <option value="4">ESP-NOW リモコン受信 (EspNowRemote)</option>
+    <option value="5">ESP-NOW 姿勢配信 (EspNowSender)</option>
   </select>
 
   <label for="ssid">Wi-Fi SSID</label>
@@ -1184,8 +1187,9 @@ const CHR_MIC_LIP_GAIN = 'e3f0a023-7b1c-4d2a-9e6f-2c5a8d4b1f00';
 // follows the avatar's mouth_open. Staged via Apply path (reboot required).
 const CHR_LED_MOUTH_SYNC = 'e3f0a024-7b1c-4d2a-9e6f-2c5a8d4b1f00';
 // OperationMode — encrypted 1-byte enum (0=MicLipSync, 1=JttsRandom,
-// 2=Conversation). Single source of truth for the avatar's primary
-// behaviour. Staged via Apply path (reboot required).
+// 2=Conversation, 3=AsrLocal, 4=EspNowRemote, 5=EspNowSender). Single source
+// of truth for the avatar's primary behaviour. Staged via Apply path (reboot
+// required).
 const CHR_OPERATION_MODE = 'e3f0a025-7b1c-4d2a-9e6f-2c5a8d4b1f00';
 // BargeInEnabled — encrypted 1-byte flag (0=disabled, 1=enabled). When
 // on, a screen tap mid-reply interrupts the AI; off by default because
