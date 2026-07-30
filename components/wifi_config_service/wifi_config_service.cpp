@@ -341,6 +341,16 @@ void set_jtts_say_kana_sink(config::JttsSayKanaSink sink)
     http::set_jtts_say_kana_sink(sink);
 }
 
+void set_dance_control_sink(config::DanceControlSink sink)
+{
+    http::set_dance_control_sink(sink);
+}
+
+void set_dance_data_sink(config::DanceDataSink sink)
+{
+    http::set_dance_data_sink(sink);
+}
+
 void set_board_kind(std::uint8_t kind)
 {
     http::set_board_kind(kind);

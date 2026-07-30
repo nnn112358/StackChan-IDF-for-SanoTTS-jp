@@ -457,6 +457,15 @@ void set_speaker_volume_sink(SpeakerVolumeSink sink);
 using JttsSayKanaSink = void (*)(std::string_view kana);
 void set_jtts_say_kana_sink(JttsSayKanaSink sink);
 
+// Dance trigger shared by both settings transports (HTTP /api/dance/*, BLE chr)
+// and the on-device UI. cmd: 1=start, 2=stop; id selects the dance (0 today).
+// The application registers the sink; it pokes SharedState.dance for the engine.
+using DanceControlSink = void (*)(std::uint8_t cmd, std::uint8_t id);
+
+// Dance data upload sink — HTTP POST /api/dance/upload raw blob body. The
+// application persists it (dance_storage). Returns true on accept.
+using DanceDataSink = bool (*)(const std::uint8_t* data, std::size_t len);
+
 // Application hooks shared by BOTH settings transports (the BLE GATT service
 // here and the HTTP service in wifi_config_service). main builds this once at
 // boot and hands the same struct to config::set_settings_hooks and

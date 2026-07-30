@@ -151,8 +151,13 @@ void servo_task_entry(void* arg)
         // uses audio_stream_active. We never poll the speaker directly: its
         // isPlaying() flickers false between streamed reply segments and would
         // let the head twitch mid-reply.
-        const bool audio_active = args.state->servo.masked.load(std::memory_order_relaxed) ||
-                                  args.state->audio_stream_active.load(std::memory_order_relaxed);
+        // ダンス中 (dance_active) は音声再生中でもサーボを動かす — 電源レール
+        // 競合による音声劣化の許容度を実機で確かめるための意図的なバイパス
+        // (docs/dance-feature-research.md §2)。
+        const bool dance = args.state->servo.dance_active.load(std::memory_order_relaxed);
+        const bool audio_active = !dance &&
+                                  (args.state->servo.masked.load(std::memory_order_relaxed) ||
+                                   args.state->audio_stream_active.load(std::memory_order_relaxed));
         if (audio_active) {
             vTaskDelayUntil(&last_wake, kPeriodTicks);
             continue;
@@ -172,6 +177,11 @@ void servo_task_entry(void* arg)
         // the default head-turn speed.
         const std::uint16_t override = args.state->servo.speed_override.load(std::memory_order_relaxed);
         const std::uint16_t speed = override != 0 ? override : kGoalSpeed;
+        // move_time_ms != 0 → 時間ベース goal (両軸を move_time で到達)。SCS0009 は
+        // time>0 のとき speed を無視するので speed=0 を渡す。ダンスの「移動秒数」用。
+        const std::uint16_t move_time = args.state->servo.move_time_ms.load(std::memory_order_relaxed);
+        const std::uint16_t goal_time = move_time;                 // 0 = 速度ベース
+        const std::uint16_t goal_speed = move_time != 0 ? 0 : speed;
 
         if (yaw_target != last_yaw_target || pitch_target != last_pitch_target) {
             // Engage torque just before driving.
@@ -181,20 +191,25 @@ void servo_task_entry(void* arg)
                 torque_on = true;
             }
             std::uint32_t mv = kMinHoldMs;
+            if (move_time != 0 && move_time > mv) mv = move_time;  // 時間ベースは既知
             if (yaw_target != last_yaw_target) {
-                const std::uint32_t a = (last_yaw_target == 0xFFFF)
-                                            ? kUnknownMoveMs
-                                            : move_ms(last_yaw_target, yaw_target, speed);
-                if (a > mv) mv = a;
-                (void)yaw.write_goal_position(yaw_target, kGoalTime, speed);
+                if (move_time == 0) {
+                    const std::uint32_t a = (last_yaw_target == 0xFFFF)
+                                                ? kUnknownMoveMs
+                                                : move_ms(last_yaw_target, yaw_target, speed);
+                    if (a > mv) mv = a;
+                }
+                (void)yaw.write_goal_position(yaw_target, goal_time, goal_speed);
                 last_yaw_target = yaw_target;
             }
             if (pitch_target != last_pitch_target) {
-                const std::uint32_t a = (last_pitch_target == 0xFFFF)
-                                            ? kUnknownMoveMs
-                                            : move_ms(last_pitch_target, pitch_target, speed);
-                if (a > mv) mv = a;
-                (void)pitch.write_goal_position(pitch_target, kGoalTime, speed);
+                if (move_time == 0) {
+                    const std::uint32_t a = (last_pitch_target == 0xFFFF)
+                                                ? kUnknownMoveMs
+                                                : move_ms(last_pitch_target, pitch_target, speed);
+                    if (a > mv) mv = a;
+                }
+                (void)pitch.write_goal_position(pitch_target, goal_time, goal_speed);
                 last_pitch_target = pitch_target;
             }
             release_at = now_ms() + mv + kSettleMarginMs;

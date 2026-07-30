@@ -96,6 +96,11 @@ public:
         // Non-zero overrides the servo task's default Goal Speed for the next
         // write_goal_position. Used for snappy gestures (head shake).
         std::atomic<std::uint16_t> speed_override{0};
+        // Non-zero selects TIME-based motion: both axes reach the commanded
+        // target in exactly this many milliseconds (SCS0009 goal-time register),
+        // overriding speed_override. Used by the dance task where each keyframe
+        // specifies "move over N ms". 0 = speed-based (the default path).
+        std::atomic<std::uint16_t> move_time_ms{0};
         // Servo torque enable. The on-device 操作 (control) screen toggles
         // this; the servo task enables/disables torque to match (false =
         // head goes limp).
@@ -122,8 +127,30 @@ public:
         // reply segments and would let the head twitch mid-reply. (BLE /
         // Wi-Fi streaming is masked separately via audio_stream_active.)
         std::atomic<bool> masked{false};
+        // Dance mode: when set, the servo task drives the head even while audio
+        // is playing (deliberately bypassing `masked`), and demo_loop suppresses
+        // its idle head poses. Set by the dance task / P0 experiment; the
+        // shared-power-rail audio-degradation tradeoff is the whole point of the
+        // test (see docs/dance-feature-research.md §2).
+        std::atomic<bool> dance_active{false};
     };
     Servo servo;
+
+    // --- Dance (dance engine consumes command; UI/BLE/HTTP write) ----------
+    struct Dance {
+        // 1 = start, 2 = stop. The dance engine exchange()s it back to 0 once
+        // consumed (like Lt::command). Written by the screen button / BLE chr /
+        // HTTP /api/dance/start|stop via dance_control().
+        std::atomic<std::uint8_t> command{0};
+        // Which dance to run (index into the on-flash / embedded catalogue).
+        std::atomic<std::uint8_t> select{0};
+        // True while a dance is playing. The UI shows a "踊り中" state; the
+        // engine also raises servo.dance_active for the duration.
+        std::atomic<bool> active{false};
+        // Playback position for UI progress (ms since dance start).
+        std::atomic<std::uint32_t> elapsed_ms{0};
+    };
+    Dance dance;
 
     // --- Conversation backend (conversation_task writes) -------------------
     struct Conversation {

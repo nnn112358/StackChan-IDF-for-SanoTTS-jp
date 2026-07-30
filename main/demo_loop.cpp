@@ -527,8 +527,9 @@ constexpr const char* kTag = "stackchan";
         }
 
         // Random yaw + pitch every 10–20 s. Suppressed when an external source
-        // (ESP-NOW remote) owns the head.
-        if (!external_servo_control && now_ms >= next_pose_ms) {
+        // (ESP-NOW remote) or the dance task owns the head.
+        if (!external_servo_control && !g_state->servo.dance_active.load(std::memory_order_relaxed) &&
+            now_ms >= next_pose_ms) {
             g_state->servo.target_yaw_deg.store(rand_in(kYawMinDeg, kYawMaxDeg), std::memory_order_relaxed);
             g_state->servo.target_pitch_deg.store(rand_in(kPitchMinDeg, kPitchMaxDeg), std::memory_order_relaxed);
             next_pose_ms = now_ms + rand_range_ms(kPoseMinMs, kPoseMaxMs);

@@ -135,6 +135,8 @@ config::MicLipGainSink g_mic_lip_gain_sink = nullptr;
 config::SpeakerVolumeGetter g_speaker_volume_getter = nullptr;
 config::SpeakerVolumeSink g_speaker_volume_sink = nullptr;
 config::JttsSayKanaSink g_jtts_say_sink = nullptr;
+config::DanceControlSink g_dance_sink = nullptr;
+config::DanceDataSink g_dance_data_sink = nullptr;
 AvatarBytecodeSink g_avatar_bytecode_sink = nullptr;
 VoiceDbSink g_voice_db_sink = nullptr;
 VoiceDbStatusGetter g_voice_db_status_getter = nullptr;
@@ -1761,6 +1763,60 @@ esp_err_t handle_jtts_say_post(httpd_req_t* req)
     return send_empty(req);
 }
 
+// POST /api/dance/start — optional body = dance id (decimal, default 0).
+// POST /api/dance/stop — no body. Drives the dance engine via the sink.
+esp_err_t handle_dance_start_post(httpd_req_t* req)
+{
+    if (!require_auth(req)) return ESP_OK;
+    std::string body;
+    (void)read_body_str(req, body, 8);  // optional; empty → id 0
+    if (g_dance_sink == nullptr) {
+        return send_error(req, "503 Service Unavailable", "dance sink not registered");
+    }
+    const int id = body.empty() ? 0 : std::atoi(body.c_str());
+    g_dance_sink(1, static_cast<std::uint8_t>(id < 0 ? 0 : id));
+    return send_empty(req);
+}
+
+esp_err_t handle_dance_stop_post(httpd_req_t* req)
+{
+    if (!require_auth(req)) return ESP_OK;
+    if (g_dance_sink == nullptr) {
+        return send_error(req, "503 Service Unavailable", "dance sink not registered");
+    }
+    g_dance_sink(2, 0);
+    return send_empty(req);
+}
+
+// POST /api/dance/upload — raw dance blob body (header + keyframes + audio).
+// Read into PSRAM (can be a few 100 KB) then hand to the sink for persistence.
+esp_err_t handle_dance_upload_post(httpd_req_t* req)
+{
+    if (!require_auth(req)) return ESP_OK;
+    if (g_dance_data_sink == nullptr) {
+        return send_error(req, "503 Service Unavailable", "dance sink not registered");
+    }
+    const std::size_t total = req->content_len;
+    if (total < 48 || total > 400 * 1024) {
+        return send_error(req, "400 Bad Request", "bad content length");
+    }
+    auto* buf = static_cast<std::uint8_t*>(heap_caps_malloc(total, MALLOC_CAP_SPIRAM));
+    if (buf == nullptr) return send_error(req, "500 Internal Server Error", "oom");
+    std::size_t got = 0;
+    while (got < total) {
+        const int r = httpd_req_recv(req, reinterpret_cast<char*>(buf) + got, total - got);
+        if (r <= 0) {
+            heap_caps_free(buf);
+            return send_error(req, "400 Bad Request", "recv failed");
+        }
+        got += static_cast<std::size_t>(r);
+    }
+    const bool ok = g_dance_data_sink(buf, total);
+    heap_caps_free(buf);
+    if (!ok) return send_error(req, "400 Bad Request", "blob rejected");
+    return send_empty(req);
+}
+
 // --- Static root ---
 
 esp_err_t handle_root_get(httpd_req_t* req)
@@ -1877,6 +1933,9 @@ void register_handlers(httpd_handle_t server, const config::DeviceConfig& curren
     add(server, "/api/speaker-volume",   HTTP_GET,  handle_speaker_volume_get);
     add(server, "/api/speaker-volume",   HTTP_POST, handle_speaker_volume_post);
     add(server, "/api/jtts-say",         HTTP_POST, handle_jtts_say_post);
+    add(server, "/api/dance/start",      HTTP_POST, handle_dance_start_post);
+    add(server, "/api/dance/stop",       HTTP_POST, handle_dance_stop_post);
+    add(server, "/api/dance/upload",     HTTP_POST, handle_dance_upload_post);
     add(server, "/api/device-name",     HTTP_POST, handle_device_name_post);
     add(server, "/api/auth-password",   HTTP_POST, handle_auth_password_post);
     // Claude Code Channel adapter API (Bearer-gated). Empty
@@ -2002,6 +2061,22 @@ void set_jtts_say_kana_sink(config::JttsSayKanaSink sink)
     if (g_mutex == nullptr) { g_jtts_say_sink = sink; return; }
     xSemaphoreTake(g_mutex, portMAX_DELAY);
     g_jtts_say_sink = sink;
+    xSemaphoreGive(g_mutex);
+}
+
+void set_dance_control_sink(config::DanceControlSink sink)
+{
+    if (g_mutex == nullptr) { g_dance_sink = sink; return; }
+    xSemaphoreTake(g_mutex, portMAX_DELAY);
+    g_dance_sink = sink;
+    xSemaphoreGive(g_mutex);
+}
+
+void set_dance_data_sink(config::DanceDataSink sink)
+{
+    if (g_mutex == nullptr) { g_dance_data_sink = sink; return; }
+    xSemaphoreTake(g_mutex, portMAX_DELAY);
+    g_dance_data_sink = sink;
     xSemaphoreGive(g_mutex);
 }
 

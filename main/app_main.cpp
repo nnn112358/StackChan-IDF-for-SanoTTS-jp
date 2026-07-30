@@ -46,6 +46,8 @@
 #include "asr_probe.hpp"
 #include "qr_task.hpp"
 #include "render_task.hpp"
+#include "dance.hpp"
+#include "dance_poc.hpp"
 #include "espnow_poc/espnow_poc.hpp"
 #include "espnow_remote/espnow_remote.hpp"
 #include "screens.hpp"
@@ -1073,6 +1075,15 @@ extern "C" void app_main()
     // 12 KiB 連続ブロックを取れるようにするため。タスク スタックは PSRAM。
     if (asr_mode) {
         asr_probe_run(*g_state);
+    }
+
+    // ダンス エンジン: 音声同期でサーボを駆動する。マイク/スピーカーを占有する
+    // ASR や、頭部を外部制御する ESP-NOW とは排他 (通常モードのみ)。トリガは
+    // HTTP /api/dance/start|stop (BLE/画面は P4)。
+    if (!asr_mode && !espnow_any) {
+        stackchan::app::start_dance_engine(*g_state, servo_limits);
+        stackchan::wifi_config::set_dance_control_sink(&stackchan::app::dance_control);
+        stackchan::wifi_config::set_dance_data_sink(&stackchan::app::dance_upload);
     }
 
     stackchan::app::run_demo_loop({

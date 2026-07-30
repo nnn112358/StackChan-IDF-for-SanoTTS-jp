@@ -101,6 +101,15 @@ void set_speaker_volume_sink(config::SpeakerVolumeSink sink);
 // the same sink is also wired to the BLE jtts-say chr.
 void set_jtts_say_kana_sink(config::JttsSayKanaSink sink);
 
+// Dance control sink — `POST /api/dance/start` (optional body = dance id) and
+// `POST /api/dance/stop`. The application registers the sink; it drives the
+// dance engine via SharedState.dance.
+void set_dance_control_sink(config::DanceControlSink sink);
+
+// Dance data upload sink — `POST /api/dance/upload` (raw blob body). The
+// application persists it to flash (dance_storage).
+void set_dance_data_sink(config::DanceDataSink sink);
+
 // Record the booted board kind (mirrors board::BoardKind cast to byte) so it
 // surfaces in /api/status under the "board" key. The web UI uses this to
 // hide controls that don't apply to the current hardware. See
