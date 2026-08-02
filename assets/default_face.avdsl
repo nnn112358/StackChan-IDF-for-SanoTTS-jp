@@ -163,10 +163,16 @@ fn effect()
 end
 
 ----------------------------------------------------------------------
--- Entry point. Order matches face.cpp:50-58 (mouth, eyes, eyebrows,
--- then effect). Balloon is drawn by the C++ side after this returns.
+-- Entry point. The effect group is drawn FIRST: its box (x >= 236)
+-- overlaps the right eye / eyebrow groups, and clearing it after they
+-- have been drawn wiped their right edge every frame (visible flicker
+-- on the right eyebrow). Painting the effect first lets the eye and
+-- eyebrow groups repaint over the overlap. Remaining order matches
+-- face.cpp:50-58 (mouth, eyes, eyebrows). Balloon is drawn by the C++
+-- side after this returns.
 ----------------------------------------------------------------------
 fn draw()
+  effect()
   let bo = breath * 3
   -- mouth (max_w / max_h clamped to >= min in face.cpp; mirror that).
   mouth(tx(163 + mouth_off_x), ty(148 + mouth_off_y),
@@ -199,5 +205,4 @@ fn draw()
     fill_circle(tx(90  - cheek_off_x), ty(140 + cheek_off_y), cr, primary)
     fill_circle(tx(230 + cheek_off_x), ty(140 + cheek_off_y), cr, primary)
   end
-  effect()
 end
