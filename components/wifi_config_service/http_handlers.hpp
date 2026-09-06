@@ -57,6 +57,9 @@ void set_dance_control_sink(config::DanceControlSink sink);
 // Dance data upload sink — see wifi_config_service.hpp.
 void set_dance_data_sink(config::DanceDataSink sink);
 
+// LT timekeeper state getter — see wifi_config_service.hpp.
+void set_lt_state_getter(config::LtStateGetter getter);
+
 // Record the booted board kind for /api/status. See wifi_config_service.hpp.
 void set_board_kind(std::uint8_t kind);
 

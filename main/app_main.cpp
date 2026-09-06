@@ -90,6 +90,18 @@ stackchan::app::ConversationTaskArgs* g_conversation_args = nullptr;
 #endif
 stackchan::app::LedTaskArgs* g_led_args = nullptr;
 
+// LT timekeeper snapshot for HTTP GET /api/lt/status. Plain atomics read —
+// safe from the httpd task; the timer itself stays owned by demo_loop.
+stackchan::config::LtStateView lt_state_view()
+{
+    stackchan::config::LtStateView v;
+    if (g_state == nullptr) return v;
+    v.active = g_state->lt.active.load(std::memory_order_relaxed);
+    v.remaining_s = g_state->lt.remaining_s.load(std::memory_order_relaxed);
+    v.total_s = g_state->lt.total_s.load(std::memory_order_relaxed);
+    return v;
+}
+
 
 
 
@@ -1085,6 +1097,10 @@ extern "C" void app_main()
         stackchan::wifi_config::set_dance_control_sink(&stackchan::app::dance_control);
         stackchan::wifi_config::set_dance_data_sink(&stackchan::app::dance_upload);
     }
+
+    // LT timekeeper の残り時間を HTTP (GET /api/lt/status) から読めるようにする。
+    // タイマー本体は demo_loop が回すので、ここは SharedState.lt の読み出しのみ。
+    stackchan::wifi_config::set_lt_state_getter(&lt_state_view);
 
     stackchan::app::run_demo_loop({
         .state = g_state,

@@ -110,6 +110,11 @@ void set_dance_control_sink(config::DanceControlSink sink);
 // application persists it to flash (dance_storage).
 void set_dance_data_sink(config::DanceDataSink sink);
 
+// LT timekeeper state getter — `GET /api/lt/status` returns
+// {"active":bool,"remaining_s":int,"total_s":int,"overtime":bool}.
+// The application registers a getter that snapshots SharedState.lt.
+void set_lt_state_getter(config::LtStateGetter getter);
+
 // Record the booted board kind (mirrors board::BoardKind cast to byte) so it
 // surfaces in /api/status under the "board" key. The web UI uses this to
 // hide controls that don't apply to the current hardware. See

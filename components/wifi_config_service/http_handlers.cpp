@@ -137,6 +137,7 @@ config::SpeakerVolumeSink g_speaker_volume_sink = nullptr;
 config::JttsSayKanaSink g_jtts_say_sink = nullptr;
 config::DanceControlSink g_dance_sink = nullptr;
 config::DanceDataSink g_dance_data_sink = nullptr;
+config::LtStateGetter g_lt_state_getter = nullptr;
 AvatarBytecodeSink g_avatar_bytecode_sink = nullptr;
 VoiceDbSink g_voice_db_sink = nullptr;
 VoiceDbStatusGetter g_voice_db_status_getter = nullptr;
@@ -1788,6 +1789,28 @@ esp_err_t handle_dance_stop_post(httpd_req_t* req)
     return send_empty(req);
 }
 
+// GET /api/lt/status — live LT timekeeper state. remaining_s is signed
+// (negative once the deadline has passed); overtime mirrors that sign so a
+// client needn't special-case it. 503 until the application registers the
+// getter (it does so before demo_loop starts, so in practice always available).
+esp_err_t handle_lt_status_get(httpd_req_t* req)
+{
+    if (!require_auth(req)) return ESP_OK;
+    xSemaphoreTake(g_mutex, portMAX_DELAY);
+    const config::LtStateGetter getter = g_lt_state_getter;
+    xSemaphoreGive(g_mutex);
+    if (getter == nullptr) {
+        return send_error(req, "503 Service Unavailable", "lt state getter not registered");
+    }
+    const config::LtStateView v = getter();
+    char buf[96];
+    std::snprintf(buf, sizeof(buf),
+                  "{\"active\":%s,\"remaining_s\":%ld,\"total_s\":%u,\"overtime\":%s}",
+                  v.active ? "true" : "false", static_cast<long>(v.remaining_s),
+                  static_cast<unsigned>(v.total_s), (v.active && v.remaining_s < 0) ? "true" : "false");
+    return send_json(req, buf);
+}
+
 // POST /api/dance/upload — raw dance blob body (header + keyframes + audio).
 // Read into PSRAM (can be a few 100 KB) then hand to the sink for persistence.
 esp_err_t handle_dance_upload_post(httpd_req_t* req)
@@ -1936,6 +1959,7 @@ void register_handlers(httpd_handle_t server, const config::DeviceConfig& curren
     add(server, "/api/dance/start",      HTTP_POST, handle_dance_start_post);
     add(server, "/api/dance/stop",       HTTP_POST, handle_dance_stop_post);
     add(server, "/api/dance/upload",     HTTP_POST, handle_dance_upload_post);
+    add(server, "/api/lt/status",        HTTP_GET,  handle_lt_status_get);
     add(server, "/api/device-name",     HTTP_POST, handle_device_name_post);
     add(server, "/api/auth-password",   HTTP_POST, handle_auth_password_post);
     // Claude Code Channel adapter API (Bearer-gated). Empty
@@ -2069,6 +2093,14 @@ void set_dance_control_sink(config::DanceControlSink sink)
     if (g_mutex == nullptr) { g_dance_sink = sink; return; }
     xSemaphoreTake(g_mutex, portMAX_DELAY);
     g_dance_sink = sink;
+    xSemaphoreGive(g_mutex);
+}
+
+void set_lt_state_getter(config::LtStateGetter getter)
+{
+    if (g_mutex == nullptr) { g_lt_state_getter = getter; return; }
+    xSemaphoreTake(g_mutex, portMAX_DELAY);
+    g_lt_state_getter = getter;
     xSemaphoreGive(g_mutex);
 }
 

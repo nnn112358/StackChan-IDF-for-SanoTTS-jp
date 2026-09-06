@@ -351,6 +351,11 @@ void set_dance_data_sink(config::DanceDataSink sink)
     http::set_dance_data_sink(sink);
 }
 
+void set_lt_state_getter(config::LtStateGetter getter)
+{
+    http::set_lt_state_getter(getter);
+}
+
 void set_board_kind(std::uint8_t kind)
 {
     http::set_board_kind(kind);

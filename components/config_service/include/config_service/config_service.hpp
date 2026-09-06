@@ -466,6 +466,16 @@ using DanceControlSink = void (*)(std::uint8_t cmd, std::uint8_t id);
 // application persists it (dance_storage). Returns true on accept.
 using DanceDataSink = bool (*)(const std::uint8_t* data, std::size_t len);
 
+// LT timekeeper live state — served by HTTP `GET /api/lt/status`. The
+// application registers a getter that snapshots SharedState.lt; the transport
+// never touches the timer itself. remaining_s is signed (negative = overtime).
+struct LtStateView {
+    bool active = false;
+    std::int32_t remaining_s = 0;
+    std::uint16_t total_s = 0;
+};
+using LtStateGetter = LtStateView (*)();
+
 // Application hooks shared by BOTH settings transports (the BLE GATT service
 // here and the HTTP service in wifi_config_service). main builds this once at
 // boot and hands the same struct to config::set_settings_hooks and
