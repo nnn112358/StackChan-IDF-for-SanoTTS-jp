@@ -90,6 +90,13 @@ struct Options {
     // ----- HMM エンジンのみ -----
     // ピッチシフト [半音]。ボイス既定ピッチからの相対 (+ で高く)。
     float hmm_half_tone = 0.0f;
+
+    // ----- sanoTTS エンジンのみ -----
+    // true (既定): モデル本来の 22.05 kHz のまま返す (sample_rate_hz を無視。
+    // リサンプル無し = 上流 SanoTTS-jp-M5StackCoreS3 と同じ経路)。呼び出し側は
+    // synthesize() の out_rate_hz で実際のレートを受け取って playRaw に渡すこと。
+    // false: sample_rate_hz へ窓付き sinc でリサンプルする。
+    bool sano_native_rate = true;
 };
 
 enum class Error {
@@ -99,9 +106,12 @@ enum class Error {
 
 const char* to_string(Error e);
 
+// out_rate_hz (省略可) に実際の出力サンプルレートが入る。通常は opt.sample_rate_hz
+// だが、sanoTTS エンジンが sano_native_rate で鳴らしたときは 22050。
 tl::expected<void, Error> synthesize(std::u32string_view kana,
                                      std::vector<std::int16_t>& out,
-                                     const Options& opt = {});
+                                     const Options& opt = {},
+                                     std::uint32_t* out_rate_hz = nullptr);
 
 // 単位連結エンジン用の音声 DB (.jvox、codec=0 の生形式) を登録する。
 // blob の寿命は呼び出し側が保証する (PSRAM バッファ / flash mmap)。

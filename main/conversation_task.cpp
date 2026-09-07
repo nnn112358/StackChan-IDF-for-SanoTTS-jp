@@ -1008,7 +1008,7 @@ private:
         // Robotic-katakoto preset: low monotone male voice, slightly halting
         // mora pace. Deliberately different from the assistant's normal voice
         // so the user clearly hears it as a separate "mode".
-        constexpr std::uint32_t kKatakotoRate = 16000;
+        std::uint32_t kKatakotoRate = 16000;  // sanoTTS が鳴らすときは 22050 に更新される
         stackchan::jtts::Options opt;
         opt.voice = stackchan::jtts::Voice::Male;
         opt.f0_hz = 140.0f;
@@ -1017,7 +1017,7 @@ private:
         opt.sample_rate_hz = kKatakotoRate;
 
         std::vector<std::int16_t> pcm;
-        auto r = stackchan::jtts::synthesize(kana, pcm, opt);
+        auto r = stackchan::jtts::synthesize(kana, pcm, opt, &kKatakotoRate);
         if (!r) {
             ESP_LOGW(kTag, "jtts synthesize failed: %s",
                      stackchan::jtts::to_string(r.error()));

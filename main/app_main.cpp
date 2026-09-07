@@ -396,6 +396,14 @@ extern "C" void app_main()
         if (profile.speaker_magnification != 0) {
             spk.magnification = profile.speaker_magnification;
         }
+        // CoreS3 内蔵スピーカー (AW88298): I2S を sanoTTS と同じ 22.05 kHz で回す
+        // (SanoTTS-jp-M5StackCoreS3 と同じ設定)。sanoTTS の出力を M5 側でリサンプル
+        // せずにそのまま鳴らせる。AW88298 はこのレートをネイティブに持つ (レジスタ
+        // 0x06 は M5Unified が sample_rate から設定)。他の音源 (16 kHz jtts / 会話の
+        // 24 kHz など) は従来どおり M5.Speaker が変換する。
+        if (!has_audio_module && M5.getBoard() == m5::board_t::board_M5StackCoreS3) {
+            spk.sample_rate = 22050;
+        }
         // Module Audio (ES8388) uses a COMPLETELY DIFFERENT I2S pinout from
         // CoreS3's internal AW88298 / ES7210, so when the module is fitted
         // we have to re-route the (single) M5.Speaker I2S to its pads. The

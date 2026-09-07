@@ -92,10 +92,13 @@ constexpr float kBaseMoraMs = 110.0f;
 constexpr float kTempoMin = 0.5f, kTempoMax = 2.0f;
 
 // 音量正規化: 発話のピークを kPeakTarget に合わせる (opt.gain は既定 0.6 に対する
-// 相対倍率として掛ける)。CoreS3 では M5Unified の出力ゲインが音量 128 (100%) で
-// ちょうど等倍なので、ピーク 0.9 = 歪まない範囲で最大に近いレベル。実機で 0.6 だと
-// 小さく聞こえた (2026-09-07)。無音に近い出力を増幅しすぎないよう倍率は 4 倍まで。
-constexpr float kPeakTarget = 0.9f;
+// 相対倍率として掛ける)。目標 0.3 は上流 SanoTTS-jp-M5StackCoreS3 の実測レベル
+// (デモ文で |max| 9627/32767 ≈ 0.29、正規化無し) に合わせたもので、CoreS3 の内蔵
+// スピーカー + ブースト無効の AW88298 ではこのあたりが歪まず聞き取れる上限だった
+// (2026-09-07: 0.9 では音量 100% でも割れて聞き取りづらかった)。大きくしたいときは
+// 音量 % (M5 側のデジタル ゲイン、100% = 等倍) か jtts 設定の gain を上げる。
+// 無音に近い出力を増幅しすぎないよう倍率は 4 倍まで。
+constexpr float kPeakTarget = 0.3f;
 constexpr float kDefaultGain = 0.6f;
 constexpr float kPeakCeiling = 0.98f;
 constexpr float kMaxGainBoost = 4.0f;
@@ -190,6 +193,10 @@ struct Synthesized {
     std::vector<float> pcm;  // 22.05 kHz、[-1, 1]
     float peak = 0.0f;
     std::int32_t n_frames = 0;
+    // 正規化前の int16 (lrintf(x × 32767)) の FNV-1a 64 bit。上流 sanoTTS-jp の
+    // QEMU / 実機記録と突き合わせるための移植検証値 (デモ文 "きょ][おわよ][いて][んきです°ね"、
+    // mora_ms 110 で W8A8+PIE 0xa69a7ebbb5ccb05f / W8A32 0xe4b645c30835d42d)。
+    std::uint64_t checksum = 1469598103934665603ull;
 };
 
 // ids → 22.05 kHz float PCM。合成中は arena を握る。
@@ -236,7 +243,16 @@ bool synthesize_pcm(const std::vector<std::int32_t>& ids, float s_v, Synthesized
         }
         if (n <= 0) break;
         const auto ns = static_cast<std::ptrdiff_t>(n) * SAAN_HOP;
-        for (std::ptrdiff_t i = 0; i < ns; ++i) out.peak = std::max(out.peak, std::fabs(chunk[i]));
+        for (std::ptrdiff_t i = 0; i < ns; ++i) {
+            out.peak = std::max(out.peak, std::fabs(chunk[i]));
+            // 上流 saan_f32_to_i16 と同じ変換・同じハッシュ (FNV-1a、LE 2 バイト)
+            long v = std::lrint(chunk[i] * 32767.0f);
+            if (v > 32767) v = 32767;
+            if (v < -32768) v = -32768;
+            const auto u = static_cast<std::uint16_t>(static_cast<std::int16_t>(v));
+            out.checksum = (out.checksum ^ (u & 0xffu)) * 1099511628211ull;
+            out.checksum = (out.checksum ^ (u >> 8)) * 1099511628211ull;
+        }
         out.pcm.insert(out.pcm.end(), chunk.begin(), chunk.begin() + ns);
 #if defined(ESP_PLATFORM)
         vTaskDelay(1);  // 1 pull ≈ 40〜150 ms。idle / 同優先度タスク (WDT 含む) に回す
@@ -258,7 +274,8 @@ internal::SincResampler g_resampler;
 
 namespace internal {
 
-bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const Options& opt) {
+bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const Options& opt,
+                 std::uint32_t& out_rate_hz) {
     std::lock_guard<std::mutex> lock(g_model.mutex);
     if (!g_model.loaded) return false;
 
@@ -270,8 +287,11 @@ bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const
     if (!synthesize_pcm(ids, SAAN_S_V * tempo_scale(opt.mora_ms), synth)) return false;
     const auto t1 = std::chrono::steady_clock::now();
 
-    if (!g_resampler.prepare(SAAN_SR, opt.sample_rate_hz)) {
-        SANO_LOGW("unsupported output rate %u", static_cast<unsigned>(opt.sample_rate_hz));
+    // 既定はモデル本来の 22.05 kHz のまま (上流と同じ、リサンプル無し)。
+    const std::uint32_t out_rate = opt.sano_native_rate ? static_cast<std::uint32_t>(SAAN_SR)
+                                                        : opt.sample_rate_hz;
+    if (!g_resampler.prepare(SAAN_SR, out_rate)) {
+        SANO_LOGW("unsupported output rate %u", static_cast<unsigned>(out_rate));
         return false;
     }
     const float scale = normalize_scale(synth.peak, opt.gain);
@@ -283,12 +303,18 @@ bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const
         return static_cast<long>(std::chrono::duration_cast<std::chrono::milliseconds>(d).count());
     };
     const double audio_ms = 1000.0 * static_cast<double>(synth.pcm.size()) / SAAN_SR;
-    SANO_LOGI("%u ids / %d frames / audio %.0f ms: synth %ld ms (xRT %.2f) + resample %ld ms "
+    SANO_LOGI("%u ids / %d frames / audio %.0f ms: synth %ld ms (xRT %.2f) + %s %ld ms "
               "→ %u samples @%u Hz, peak %.2f×%.2f",
               static_cast<unsigned>(ids.size()), static_cast<int>(synth.n_frames), audio_ms, ms(t1 - t0),
-              audio_ms > 0 ? static_cast<double>(ms(t1 - t0)) / audio_ms : 0.0, ms(t2 - t1),
-              static_cast<unsigned>(out.size() - out_before), static_cast<unsigned>(opt.sample_rate_hz),
+              audio_ms > 0 ? static_cast<double>(ms(t1 - t0)) / audio_ms : 0.0,
+              out_rate == SAAN_SR ? "convert" : "resample", ms(t2 - t1),
+              static_cast<unsigned>(out.size() - out_before), static_cast<unsigned>(out_rate),
               static_cast<double>(synth.peak), static_cast<double>(scale));
+    SANO_LOGI("pcm checksum FNV-1a 0x%08lx%08lx (s_v %.4f)",
+              static_cast<unsigned long>(synth.checksum >> 32),
+              static_cast<unsigned long>(synth.checksum & 0xffffffffu),
+              static_cast<double>(SAAN_S_V * tempo_scale(opt.mora_ms)));
+    out_rate_hz = out_rate;
     return true;
 }
 
@@ -335,7 +361,9 @@ bool set_sano_model(std::span<const std::uint8_t>) { return false; }
 bool sano_model_loaded() { return false; }
 
 namespace internal {
-bool render_sano(std::u32string_view, std::vector<std::int16_t>&, const Options&) { return false; }
+bool render_sano(std::u32string_view, std::vector<std::int16_t>&, const Options&, std::uint32_t&) {
+    return false;
+}
 }  // namespace internal
 
 }  // namespace stackchan::jtts

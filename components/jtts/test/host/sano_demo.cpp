@@ -79,17 +79,20 @@ int main(int argc, char** argv) {
         opt.gain = 0.8f;
         if (argc >= 6) opt.mora_ms = std::strtof(argv[5], nullptr);
         if (argc >= 7) opt.sample_rate_hz = static_cast<std::uint32_t>(std::strtoul(argv[6], nullptr, 10));
+        // rate_hz を明示したときだけリサンプル経路、省略時はネイティブ 22.05 kHz
+        if (argc >= 7) opt.sano_native_rate = false;
         std::vector<std::int16_t> pcm;
-        auto r = synthesize(to_u32(argv[3]), pcm, opt);
+        std::uint32_t rate = 0;
+        auto r = synthesize(to_u32(argv[3]), pcm, opt, &rate);
         if (!r) {
             std::fprintf(stderr, "synthesize failed: %s\n", to_string(r.error()));
             return 1;
         }
         int peak = 0;
         for (auto v : pcm) peak = std::max(peak, std::abs(static_cast<int>(v)));
-        std::printf("%zu samples @%u Hz (%.2f s), peak %d\n", pcm.size(), opt.sample_rate_hz,
-                    static_cast<double>(pcm.size()) / opt.sample_rate_hz, peak);
-        if (!write_wav_mono16(argv[4], pcm, opt.sample_rate_hz)) {
+        std::printf("%zu samples @%u Hz (%.2f s), peak %d\n", pcm.size(), rate,
+                    static_cast<double>(pcm.size()) / rate, peak);
+        if (!write_wav_mono16(argv[4], pcm, rate)) {
             std::fprintf(stderr, "cannot write %s\n", argv[4]);
             return 1;
         }

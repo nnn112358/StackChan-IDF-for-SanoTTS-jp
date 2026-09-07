@@ -104,23 +104,33 @@ void test_synthesis(const char* path) {
     opt.engine = Engine::Sano;
     opt.gain = 0.6f;
     std::vector<std::int16_t> pcm;
-    // 上流のデモ文 (53 ids / 106 frames が既知の値)。
-    auto r = synthesize(U"きょ][おわよ][いて][んきです°ね", pcm, opt);
+    std::uint32_t rate = 0;
+    // 上流のデモ文 (53 ids / 106 frames が既知の値)。既定はネイティブ 22.05 kHz。
+    auto r = synthesize(U"きょ][おわよ][いて][んきです°ね", pcm, opt, &rate);
     check(static_cast<bool>(r), "synthesize demo sentence");
-    // 106 frames × 256 sample @22.05 kHz → 16 kHz
+    check(rate == 22050, "native rate reported as 22050 Hz");
+    check(pcm.size() == static_cast<std::size_t>(106) * 256, "sample count = 106 frames × 256 (no resample)");
+    // リサンプル経路 (sano_native_rate = false): 106 frames × 256 @22.05 kHz → 16 kHz
+    Options opt16 = opt;
+    opt16.sano_native_rate = false;
+    std::vector<std::int16_t> pcm16;
+    std::uint32_t rate16 = 0;
+    check(static_cast<bool>(synthesize(U"きょ][おわよ][いて][んきです°ね", pcm16, opt16, &rate16)) &&
+              rate16 == 16000, "resample path reports 16000 Hz");
     const std::size_t expect = static_cast<std::size_t>(106) * 256 * 16000 / 22050;
-    std::printf("       %zu samples (expected %zu)\n", pcm.size(), expect);
-    check(pcm.size() == expect, "sample count matches 106 frames resampled to 16 kHz");
+    std::printf("       %zu samples (expected %zu)\n", pcm16.size(), expect);
+    check(pcm16.size() == expect, "sample count matches 106 frames resampled to 16 kHz");
     int peak = 0;
     for (auto v : pcm) peak = std::max(peak, std::abs(static_cast<int>(v)));
     std::printf("       peak %d\n", peak);
-    check(peak > 0.85 * 32760 && peak <= 0.9 * 32760 + 8, "peak normalised to 0.9 at default gain 0.6");
+    check(peak > 0.28 * 32760 && peak <= 0.3 * 32760 + 8, "peak normalised to 0.3 at default gain 0.6");
 
-    // Auto はモデルがあれば Sano を選ぶ (Formant より長い 22.05 kHz 由来の長さで判別)
+    // Auto はモデルがあれば Sano を選ぶ (レート 22050 で判別)
     Options auto_opt;
     std::vector<std::int16_t> pcm_auto;
-    check(static_cast<bool>(synthesize(U"きょ][おわよ][いて][んきです°ね", pcm_auto, auto_opt)) &&
-              pcm_auto.size() == pcm.size(),
+    std::uint32_t rate_auto = 0;
+    check(static_cast<bool>(synthesize(U"きょ][おわよ][いて][んきです°ね", pcm_auto, auto_opt, &rate_auto)) &&
+              pcm_auto.size() == pcm.size() && rate_auto == 22050,
           "Engine::Auto picks Sano when the model is loaded");
 
     // 読めない文はフォールバック (Sano は false、Formant が鳴る)

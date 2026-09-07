@@ -27,7 +27,9 @@ jtts::Options resolve_speech_options(const std::string& json,
 // task uses to drive the avatar's mouth.
 class Speech {
 public:
-    // Sample rate of synthesised audio. 16 kHz int16.
+    // Sample rate requested from jtts (formant / unit / HMM). 16 kHz int16.
+    // The sanoTTS engine returns its native 22.05 kHz instead; say() plays
+    // and builds the mouth envelope at whatever rate synthesize() reports.
     static constexpr std::uint32_t kSampleRate = 16'000;
 
     // Envelope window — one envelope sample covers this many ms of audio.
@@ -88,6 +90,8 @@ private:
 
     std::atomic<std::uint32_t> start_ms_{0};
     std::atomic<std::uint32_t> duration_ms_{0};
+    // 直前の発話の実サンプルレート (sanoTTS は 22.05 kHz、他は kSampleRate)。
+    std::uint32_t rate_hz_{kSampleRate};
 };
 
 } // namespace stackchan::app

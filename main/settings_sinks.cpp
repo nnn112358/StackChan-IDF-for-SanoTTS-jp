@@ -209,9 +209,9 @@ void start_say_worker(std::string_view kana_utf8)
             stackchan::jtts::Options opt = g_say_opts_ready
                 ? g_say_opts
                 : stackchan::app::resolve_speech_options("", stackchan::app::Speech::kSampleRate);
-            const std::uint32_t rate = opt.sample_rate_hz;
+            std::uint32_t rate = opt.sample_rate_hz;  // sanoTTS は 22.05 kHz を返す
             std::vector<std::int16_t> pcm;
-            if (auto r = stackchan::jtts::synthesize(kana, pcm, opt); !r) {
+            if (auto r = stackchan::jtts::synthesize(kana, pcm, opt, &rate); !r) {
                 ESP_LOGW(kTag, "say synth fail: %s",
                          stackchan::jtts::to_string(r.error()));
                 vTaskDeleteWithCaps(nullptr);

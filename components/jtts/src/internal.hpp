@@ -126,8 +126,10 @@ bool build_sano_intermediate(std::u32string_view text, std::string& out,
                              std::size_t* skipped = nullptr);
 
 // sanoTTS エンジン本体。モデル未ロード・G2P 失敗・350 ids 超・メモリ不足は
-// out を触らず false (呼び出し側がフォールバック)。22.05 kHz で合成して
-// opt.sample_rate_hz へ窓付き sinc でリサンプルし、ピークを opt.gain に正規化する。
-bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const Options& opt);
+// out を触らず false (呼び出し側がフォールバック)。22.05 kHz で合成し、
+// opt.sano_native_rate ならそのまま (out_rate_hz = 22050)、そうでなければ
+// opt.sample_rate_hz へ窓付き sinc でリサンプルする。ピークは opt.gain 相対で正規化。
+bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const Options& opt,
+                 std::uint32_t& out_rate_hz);
 
 }  // namespace stackchan::jtts::internal

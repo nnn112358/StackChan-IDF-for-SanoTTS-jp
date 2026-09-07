@@ -79,14 +79,18 @@ void apply_formant_scale(std::vector<internal::Segment>& segs, float scale) {
 }  // namespace
 
 tl::expected<void, Error> synthesize(std::u32string_view kana,
-                                     std::vector<std::int16_t>& out, const Options& opt_in) {
+                                     std::vector<std::int16_t>& out, const Options& opt_in,
+                                     std::uint32_t* out_rate_hz) {
     out.clear();
     Options opt = resolve_defaults(opt_in);
+    if (out_rate_hz != nullptr) *out_rate_hz = opt.sample_rate_hz;
 
     // sanoTTS エンジン: モデルがロード済みなら最優先 (ニューラル、品質最良)。
     // 読めない / 長すぎる / モデル無しは false を返すので下へ落ちる。
     if (opt.engine == Engine::Auto || opt.engine == Engine::Sano) {
-        if (internal::render_sano(kana, out, opt)) {
+        std::uint32_t rate = opt.sample_rate_hz;
+        if (internal::render_sano(kana, out, opt, rate)) {
+            if (out_rate_hz != nullptr) *out_rate_hz = rate;
             return {};
         }
     }

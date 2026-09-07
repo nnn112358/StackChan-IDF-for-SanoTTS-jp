@@ -244,16 +244,18 @@ bool Speech::say(std::u32string_view reading)
     opt.sample_rate_hz = kSampleRate; // playback rate is fixed for envelope sync
 
     pcm_.clear();
-    auto r = jtts::synthesize(std::u32string{reading}, pcm_, opt);
+    std::uint32_t rate = kSampleRate;
+    auto r = jtts::synthesize(std::u32string{reading}, pcm_, opt, &rate);
     if (!r || pcm_.empty()) {
         return false;
     }
+    rate_hz_ = rate;  // sanoTTS returns its native 22.05 kHz
 
-    build_envelope_from_pcm(pcm_, envelope_, kSampleRate, kEnvelopeStepMs);
+    build_envelope_from_pcm(pcm_, envelope_, rate, kEnvelopeStepMs);
 
     duration_ms_.store(
         static_cast<std::uint32_t>(static_cast<float>(pcm_.size()) * 1000.0f /
-                                   static_cast<float>(kSampleRate)),
+                                   static_cast<float>(rate)),
         std::memory_order_relaxed);
     start_ms_.store(static_cast<std::uint32_t>(esp_timer_get_time() / 1000),
                     std::memory_order_release);
@@ -273,7 +275,7 @@ bool Speech::say(std::u32string_view reading)
                  static_cast<unsigned>(live.sample_rate),
                  static_cast<unsigned>(pcm_.size()));
     }
-    M5.Speaker.playRaw(pcm_.data(), pcm_.size(), kSampleRate, /*stereo=*/false,
+    M5.Speaker.playRaw(pcm_.data(), pcm_.size(), rate_hz_, /*stereo=*/false,
                        /*repeat=*/1, /*channel=*/-1,
                        /*stop_current_sound=*/true);
     return true;
