@@ -6,7 +6,8 @@
 --   参照したのは座標・色・形 (数値の事実) だけで、コードは持ち込んでいない。
 --
 -- 原作の要素 (320×240):
---   * 真っ赤な背景 (TFT_RED = 0xF800) に黒 (0x0000) のパーツ
+--   * 原作は真っ赤な背景 (TFT_RED = 0xF800)。ここではシアン (TFT_CYAN = 0x07FF) に
+--     変えてある。パーツは黒 (0x0000)
 --   * 眉: 目の上から外側上方へ伸びる三角形 (怒り眉)。先端が毎フレーム震える
 --   * 目: 半径 25 の黒丸。位置が毎フレーム 0〜5 px 震える
 --   * 口: x 133〜193、y 188 を中心に高さ `open` の矩形 (2 つの三角形)
@@ -80,7 +81,7 @@ fn mouth(cx, cy, w, min_h, max_h, color)
 end
 
 fn draw()
-  let red = 0xF800
+  let bg = 0x07FF      -- シアン (原作の赤 0xF800 から変更)
   let black = 0x0000
 
   -- 擬似乱数 (原作の random(10) / random(15) / random(5) 相当)。
@@ -96,9 +97,9 @@ fn draw()
   let je_x2 = (f * 4001) % 5
   let je_y2 = (f * 9973) % 5
 
-  -- 背景: 原作の fillSprite(TFT_RED)。FaceTuning の背景色は使わない
+  -- 背景: 原作の fillSprite(TFT_RED) 相当 (色はシアン)。FaceTuning の背景色は使わない
   begin_group(0, 0, canvas_w, canvas_h)
-  fill_rect(0, 0, canvas_w, canvas_h, red)
+  fill_rect(0, 0, canvas_w, canvas_h, bg)
   end_group()
 
   -- 口 (133..193 × 188 中心)。mouth_off で微調整
@@ -106,8 +107,8 @@ fn draw()
 
   -- 目 (90, 93) / (230, 93)、r = 25。震え 0..5 px
   let r = sz(25)
-  eye(tx(90  - eye_off_x + je_x1), ty(93 + eye_off_y + je_y1), r, black, red)
-  eye(tx(230 + eye_off_x + je_x2), ty(93 + eye_off_y + je_y2), r, black, red)
+  eye(tx(90  - eye_off_x + je_x1), ty(93 + eye_off_y + je_y1), r, black, bg)
+  eye(tx(230 + eye_off_x + je_x2), ty(93 + eye_off_y + je_y2), r, black, bg)
 
   -- 眉 (怒り眉)。画面右: (190, 50..70) → (280+j, 25+j)、画面左: (130, 50..70) → (50+j, 25+j)
   if eyebrows_visible then

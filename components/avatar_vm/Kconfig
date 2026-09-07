@@ -8,6 +8,6 @@ config AVATAR_DEFAULT_FACE
         ビルド時に tools/avatar_dsl/cli.mjs でコンパイルされ、NVS に顔が
         無いときと POST /api/avatar-dsl/reset のときに使われる。
         候補: default_face.avdsl (スタックチャン標準) / omega_mouth.avdsl /
-        aokko_face.avdsl / purin_face.avdsl (「プリンを守る技術」の真っ赤な顔)。
+        aokko_face.avdsl / purin_face.avdsl (「プリンを守る技術」の顔、シアン背景)。
 
 endmenu

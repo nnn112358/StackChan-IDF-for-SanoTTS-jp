@@ -43,7 +43,7 @@ Pages サイトに反映されます。
 - **アバター描画**: M5GFX で 30 fps。呼吸 / saccade / blink、6 表情 (Neutral / Happy
   / Sad / Angry / Doubt / Sleepy)。**Avatar DSL** (`.avdsl` ソース → `.avbc` バイトコード)
   で顔のレイアウトとアニメーションを差し替え可能 (BLE / Wi-Fi 経由でライブ更新)。
-  このフォークの組み込みデフォルト顔は aNo研「プリンを守る技術」の真っ赤な顔
+  このフォークの組み込みデフォルト顔は aNo研「プリンを守る技術」の顔 (背景はシアンに変更)
   ([assets/purin_face.avdsl](assets/purin_face.avdsl)、`CONFIG_AVATAR_DEFAULT_FACE` で
   切り替え)。スタックチャン標準の顔は設定ページのプリセット `default` から戻せる。
 - **マイク連動口パク (lip sync)**: FFT + 帯域 log + spectral flux で開口度推定、
