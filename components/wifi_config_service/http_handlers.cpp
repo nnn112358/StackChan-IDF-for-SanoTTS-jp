@@ -1413,8 +1413,8 @@ esp_err_t handle_sano_model_get(httpd_req_t* req)
     xSemaphoreGive(g_mutex);
     const SanoModelStatus st = getter ? getter() : SanoModelStatus{};
     char body[96];
-    std::snprintf(body, sizeof(body), R"({"loaded":%s,"capacity":%u})",
-                  st.loaded ? "true" : "false", static_cast<unsigned>(st.capacity));
+    std::snprintf(body, sizeof(body), R"({"loaded":%s,"dict":%s,"capacity":%u})",
+                  st.loaded ? "true" : "false", st.dict ? "true" : "false", static_cast<unsigned>(st.capacity));
     return send_json(req, body);
 }
 

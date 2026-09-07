@@ -69,6 +69,14 @@ menu "Stack-chan feature gates"
             実機で判定する go/no-go 実験。通常モードの起動末尾で一度走る。
             リリース ビルドでは無効のままにすること。
 
+    config STACKCHAN_JP_FONT_16_ONLY
+        bool "Use only the 16 px Japanese font (saves ~570 KB of flash)"
+        default n
+        help
+            M5GFX の日本語フォントは 12/16/20/24 px の 4 サイズを使っていて 1 サイズ約
+            190 KB。ON にすると全部 lgfxJapanGothic_16 で描く (吹き出し・本体 UI・AP 画面)。
+            flash がきつい単一アプリ構成 (cores3-dict) 用。
+
     config STACKCHAN_ESPNOW_REMOTE_ENABLED
         bool "Enable ESP-NOW remote-control receiver mode"
         default y

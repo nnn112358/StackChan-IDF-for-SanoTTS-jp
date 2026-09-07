@@ -17,6 +17,7 @@ bool init();
 
 struct Status {
     bool loaded = false;         // jtts に登録済みか
+    bool dict = false;           // 端末内漢字 G2P の辞書が使えるか (cores3-dict)
     std::uint32_t capacity = 0;  // パーティション容量 (0 = パーティションなし)
 };
 Status status();

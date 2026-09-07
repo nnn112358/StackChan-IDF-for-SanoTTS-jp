@@ -143,6 +143,14 @@ bool set_sano_model(std::span<const std::uint8_t> blob);
 // sanoTTS モデルがロード済みか。
 bool sano_model_loaded();
 
+// 端末内漢字 G2P の辞書 (saanotts_core の `jdict_t`、呼び出し側が mmap して開いたもの) を
+// 登録する。opaque ポインタなのは jtts の公開ヘッダに C99 コアの型を出さないため。寿命は
+// 呼び出し側が保証する。nullptr で解除。CONFIG_JTTS_SANO_KANJI 無効ビルドでは常に false。
+// 登録後、漢字・カタカナ語を含む読みは辞書経路 (Open JTalk) で ids になり、かなだけの読みは
+// 従来どおり中間表現 G2P (アクセント記号が効く) を通る。
+bool set_sano_dict(const void* jdict);
+bool sano_dict_loaded();
+
 // sanoTTS のストリーミング合成 (Engine::Sano 専用)。synthesize() が発話全体を作って
 // から返すのに対し、こちらは begin() で総サンプル数を確定したあと pull() でチャンク
 // (最大 kChunkSamples = 2,048 sample ≈ 93 ms) ずつ取り出せるので、呼び出し側は

@@ -36,6 +36,20 @@ HMM 音声合成エンジン。`components/hts_engine/` に組み込み向け改
 - Copyright (c) 2026 yousan — MIT License
 - ライセンス全文: [components/saanotts_core/LICENSE](components/saanotts_core/LICENSE)
 
+### Open JTalk — Modified BSD (cores3-dict のみ)
+
+端末内漢字 G2P に使う Open JTalk のテキスト処理部 (`components/saanotts_core/openjtalk/`、
+sanoTTS-jp が pyopenjtalk-plus から取り込んだもの。`jpcommon_label.c` の MAXBUFLEN 変更のみ)。
+
+- Copyright (c) 2008-2016 Nagoya Institute of Technology / HTS Working Group — Modified BSD
+- ライセンス全文: [components/saanotts_core/openjtalk/COPYING](components/saanotts_core/openjtalk/COPYING)
+
+### 辞書 `k1-dict-438750.bin` — Modified BSD (cores3-dict のみ、git 非同梱)
+
+NAIST Japanese Dictionary (NAIST) と UniDic (The UniDic Consortium) を sanoTTS-jp が TTS 用に
+枝刈り・形式変換した派生物。`tools/get-sano-dict.sh` で取得し `dict` パーティションに書き込む。
+帰属表示: [assets/sanotts/NOTICE-dictionary.txt](assets/sanotts/NOTICE-dictionary.txt)。
+
 ---
 
 ## 音声モデル (sanoTTS-jp 重み)

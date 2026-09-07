@@ -9,6 +9,12 @@
 
 #include <jtts/jtts.hpp>
 
+#if defined(CONFIG_JTTS_SANO_KANJI)
+extern "C" {
+#include "saan_dict.h"
+}
+#endif
+
 namespace stackchan::app::sano_model {
 
 namespace {
@@ -18,6 +24,10 @@ constexpr const char* kPart = "sano";
 
 const esp_partition_t* g_part = nullptr;
 esp_partition_mmap_handle_t g_mmap = 0;
+#if defined(CONFIG_JTTS_SANO_KANJI)
+jdict_t g_dict{};
+bool g_dict_ok = false;
+#endif
 
 const esp_partition_t* find_partition() {
     if (g_part == nullptr) {
@@ -54,6 +64,18 @@ bool init() {
     }
     g_mmap = mh;
     ESP_LOGI(kTag, "sanoTTS model mapped from \"%s\" @0x%x", kPart, static_cast<unsigned>(part->address));
+#if defined(CONFIG_JTTS_SANO_KANJI)
+    // 端末内漢字 G2P: dict パーティション (13.7 MB) を esp_mmu_map で貼って登録する。
+    // 開けなくても sanoTTS 自体はかな入力で使える。
+    if (saan_dict_open(&g_dict) && jtts::set_sano_dict(&g_dict)) {
+        g_dict_ok = true;
+        ESP_LOGI(kTag, "kanji G2P dictionary active (%u surfaces / %u entries) — kanji text accepted",
+                 static_cast<unsigned>(g_dict.n_surfaces), static_cast<unsigned>(g_dict.n_entries));
+    } else {
+        ESP_LOGW(kTag, "kanji dictionary unavailable — flash assets/sanotts/k1-dict-438750.bin to the "
+                       "\"dict\" partition (make flash BOARD=cores3-dict). Kana-only input.");
+    }
+#endif
     return true;
 #endif
 }
@@ -61,6 +83,7 @@ bool init() {
 Status status() {
     Status st;
     st.loaded = jtts::sano_model_loaded();
+    st.dict = jtts::sano_dict_loaded();
     if (const esp_partition_t* part = find_partition(); part != nullptr) {
         st.capacity = part->size;
     }

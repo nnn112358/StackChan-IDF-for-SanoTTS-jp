@@ -21,16 +21,24 @@ target_compile_definitions(hts_engine PRIVATE AUDIO_PLAY_NONE HTS_EMBEDDED)
 
 # sanoTTS-jp 推論コア (vendored C99)。ホストは PIE 無し (W8A8 スカラ経路)。
 set(SANO_ROOT ${JTTS_ROOT}/../saanotts_core)
+file(GLOB SANO_OJT ${SANO_ROOT}/openjtalk/*.c)
 add_library(saanotts_core STATIC
     ${SANO_ROOT}/saanotts.c
     ${SANO_ROOT}/saanotts_stream.c
     ${SANO_ROOT}/fft.c
     ${SANO_ROOT}/saanotts_int8.c
     ${SANO_ROOT}/g2p.c
+    # 端末内漢字 G2P (ホストは素の calloc、辞書はファイルから読む)
+    ${SANO_ROOT}/jdict.c
+    ${SANO_ROOT}/accent.c
+    ${SANO_ROOT}/njd_rules.c
+    ${SANO_ROOT}/label_ids.c
+    ${SANO_ROOT}/saan_kanji.c
+    ${SANO_OJT}
 )
-target_include_directories(saanotts_core PUBLIC ${SANO_ROOT})
-target_compile_definitions(saanotts_core PRIVATE SAAN_INT8_ACT=1)
-target_compile_options(saanotts_core PRIVATE -Wall -Wextra -O2)
+target_include_directories(saanotts_core PUBLIC ${SANO_ROOT} ${SANO_ROOT}/openjtalk)
+target_compile_definitions(saanotts_core PRIVATE SAAN_INT8_ACT=1 PUBLIC CHARSET_UTF_8 SAAN_KANJI=1 LABEL_IDS_EXTERNAL_SCRATCH=1)
+target_compile_options(saanotts_core PRIVATE -O2 -w)
 target_link_libraries(saanotts_core PUBLIC m)
 
 add_library(jtts STATIC
@@ -97,7 +105,7 @@ target_compile_options(jtts_hmm_demo PRIVATE -Wall -Wextra)
 
 # sanoTTS エンジン: かな中間表現ダンプ + かな→WAV デモ
 add_executable(jtts_sano_demo sano_demo.cpp wav_writer.cpp)
-target_link_libraries(jtts_sano_demo PRIVATE jtts)
+target_link_libraries(jtts_sano_demo PRIVATE jtts saanotts_core)
 target_include_directories(jtts_sano_demo PRIVATE ${JTTS_ROOT}/src)
 target_compile_options(jtts_sano_demo PRIVATE -Wall -Wextra)
 

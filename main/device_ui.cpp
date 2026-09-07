@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
 // SPDX-License-Identifier: BSL-1.0
 
+#include "avatar/jp_font.hpp"
 #include "device_ui.hpp"
 
 #include <atomic>
@@ -56,8 +57,8 @@ enum Page : int {
 const char* const kTabLabels[kTabCount] = {"情報", "設定1", "設定2", "操作", "範囲", "会話", "LT"};
 int num_tab_pages() { return (kTabCount + kTabsPerPage - 1) / kTabsPerPage; }
 
-const auto* const kFontTitle = &fonts::lgfxJapanGothic_24;
-const auto* const kFontBody = &fonts::lgfxJapanGothic_16;
+const auto* const kFontTitle = stackchan::avatar::jp_font_24();
+const auto* const kFontBody = stackchan::avatar::jp_font_16();
 
 SharedState* g_state = nullptr;
 

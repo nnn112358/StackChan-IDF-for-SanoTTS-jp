@@ -44,3 +44,6 @@ components/jtts/test/host/build/
 
 # Rust BLE CLI build artifacts
 /tools/ble-cli/target/
+
+# sanoTTS 漢字 G2P の辞書 (13.7 MB、tools/get-sano-dict.sh で取る)
+assets/sanotts/k1-dict-*.bin

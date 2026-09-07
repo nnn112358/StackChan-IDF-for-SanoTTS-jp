@@ -168,7 +168,7 @@ struct DeviceConfig {
     // check immediately after audio init. Defaults to true (= ships behaviour
     // before the flag existed). Set to false for a silent boot. Takes effect
     // after the Apply reboot.
-    bool startup_arpeggio_enabled = true;
+    bool startup_arpeggio_enabled = false;  // この fork では既定 OFF (設定ページ / BLE で ON にできる)
     // Master servo enable. When false, the servo VM rail stays off at boot AND
     // the servo task is never spawned (i.e. the head stays completely silent
     // and limp). Distinct from SharedState::servo_enabled which is the runtime

@@ -16,6 +16,10 @@
 #include "jtts/jtts.hpp"
 #include "wav_writer.hpp"
 
+extern "C" {
+#include "jdict.h"
+}
+
 using namespace stackchan::jtts;
 
 namespace {
@@ -56,6 +60,34 @@ int main(int argc, char** argv) {
         }
         std::printf("%s\n", inter.c_str());
         return 0;
+    }
+    if (argc >= 6 && std::strcmp(argv[1], "synthk") == 0) {
+        // 辞書付き: jtts_sano_demo synthk <model.bin> <dict.bin> <漢字かな交じり文> <out.wav>
+        std::ifstream f(argv[2], std::ios::binary);
+        std::ifstream fd(argv[3], std::ios::binary);
+        if (!f || !fd) { std::fprintf(stderr, "cannot open model / dict\n"); return 1; }
+        std::vector<std::uint8_t> raw((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        std::vector<std::uint8_t> blob(raw.size() + 16);
+        auto* base = blob.data();
+        while ((reinterpret_cast<std::uintptr_t>(base) & 15u) != 0u) ++base;
+        std::memcpy(base, raw.data(), raw.size());
+        if (!set_sano_model({base, raw.size()})) { std::fprintf(stderr, "model load failed\n"); return 1; }
+        static std::vector<std::uint8_t> dict_raw((std::istreambuf_iterator<char>(fd)), std::istreambuf_iterator<char>());
+        static std::vector<std::uint8_t> dict_blob(dict_raw.size() + 16);
+        auto* dbase = dict_blob.data();
+        while ((reinterpret_cast<std::uintptr_t>(dbase) & 15u) != 0u) ++dbase;
+        std::memcpy(dbase, dict_raw.data(), dict_raw.size());
+        static jdict_t dict;
+        if (jdict_open(&dict, dbase, dict_raw.size()) != 0) { std::fprintf(stderr, "jdict_open failed\n"); return 1; }
+        if (!set_sano_dict(&dict)) { std::fprintf(stderr, "set_sano_dict failed\n"); return 1; }
+        Options opt;
+        opt.engine = Engine::Sano;
+        std::vector<std::int16_t> pcm;
+        std::uint32_t rate = 0;
+        auto r = synthesize(to_u32(argv[4]), pcm, opt, &rate);
+        if (!r) { std::fprintf(stderr, "synthesize failed: %s\n", to_string(r.error())); return 1; }
+        std::printf("%zu samples @%u Hz (%.2f s)\n", pcm.size(), rate, static_cast<double>(pcm.size()) / rate);
+        return write_wav_mono16(argv[5], pcm, rate) ? 0 : 1;
     }
     if (argc >= 5 && std::strcmp(argv[1], "synth") == 0) {
         std::ifstream f(argv[2], std::ios::binary);

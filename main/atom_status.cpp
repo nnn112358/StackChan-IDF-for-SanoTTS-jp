@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
 // SPDX-License-Identifier: BSL-1.0
 
+#include "avatar/jp_font.hpp"
 #include "atom_status.hpp"
 
 #include <atomic>
@@ -233,7 +234,7 @@ bool draw(avatar::RichCanvas& canvas)
         ? (h - 8 * row_h) / 2  // 8 rows centered vertically
         : 6;
 
-    canvas.setFont(large ? &fonts::lgfxJapanGothic_20 : &fonts::lgfxJapanGothic_12);
+    canvas.setFont(large ? stackchan::avatar::jp_font_20() : stackchan::avatar::jp_font_12());
     canvas.setTextDatum(lgfx::textdatum_t::top_left);
 
     auto kv = [&](int row, const char* key, const char* value, std::uint16_t vcolor) {

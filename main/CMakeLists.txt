@@ -6,6 +6,7 @@ set(_main_priv_reqs
     config_service
     wifi_config_service
     jtts
+    saanotts_core
     telegram
     espressif__esp_audio_codec
     espressif__esp-sr
@@ -36,7 +37,6 @@ set(_main_srcs
     "app_main.cpp"
     "asr_probe.cpp"
     "atom_status.cpp"
-    "audio_codec.cpp"
     "battery.cpp"
     "camera_service.cpp"
     "dance.cpp"
@@ -66,6 +66,11 @@ set(_main_srcs
 )
 if(CONFIG_STACKCHAN_CONVERSATION_ENABLED)
     list(APPEND _main_srcs "conversation_task.cpp")
+endif()
+# AAC/Opus codec glue (esp_audio_codec, ~290 KB) is only reachable from the
+# streaming / conversation paths; leave it out of slim profiles (cores3-dict).
+if(CONFIG_STACKCHAN_CONVERSATION_ENABLED OR CONFIG_STACKCHAN_AUDIO_STREAM_ENABLED OR CONFIG_STACKCHAN_WIFI_AUDIO_ENABLED)
+    list(APPEND _main_srcs "audio_codec.cpp")
 endif()
 if(CONFIG_STACKCHAN_AUDIO_STREAM_ENABLED)
     list(APPEND _main_srcs "audio_stream_sink.cpp")

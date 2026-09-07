@@ -51,7 +51,7 @@ Pages サイトに反映されます。
 - **サーボ**: SCS0009 yaw + pitch を UART1 (1 Mbps) で制御。台形速度
   プロファイル `PathGenerator`、駆動時のみトルク有効化。ボード別レンジ
   キャリブレーション (ServoLimits) を NVS 保存。
-- **スピーカー / オーディオ**: 起動音 (C5–D5–E5–F5–G5 (ドレミファソ)、設定で OFF 可)、jtts ランダム
+- **スピーカー / オーディオ**: 起動音 (ドレミファソ、既定 OFF・設定で ON 可)、jtts ランダム
   babble、AAC 録音再生、BLE オーディオ ストリーム、Wi-Fi RTP (L16 / μ-law / AAC) 受信。
   音量は **0..200%** をライブ制御 (BLE / Wi-Fi / 本体 UI)。
 - **sanoTTS-jp ニューラル TTS** (CoreS3): [sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp)
@@ -62,6 +62,13 @@ Pages サイトに反映されます。
   かなに加えて sanoTTS 中間表現 (`[` 上昇 / `]` 下降核 / `#` 句境界 / `°` 無声化 / `?`)
   をそのまま書ける。詳細は [components/saanotts_core/README.md](components/saanotts_core/README.md)、
   モデルの帰属表示と用途制限は [assets/sanotts/NOTICE.md](assets/sanotts/NOTICE.md)。
+  再生は合成しながら鳴らすストリーミング (先読み量は前回の実測 xRT から自動)。
+- **辞書入り slim ビルド `BOARD=cores3-dict`**: sanoTTS-jp 上流の端末内漢字 G2P
+  (Open JTalk + 辞書 13.7 MB) を載せ、`/api/jtts-say` に**漢字かな交じり文をそのまま**
+  送れる。辞書のために flash を単一アプリ (2.19 MiB) + 重み + 辞書に割り直すので
+  ([partitions_16mb_dict.csv](partitions_16mb_dict.csv))、OTA / 会話 / オーディオ ストリーム /
+  カメラ / ASR / HMM / ESP-NOW は外れ、日本語フォントは 16 px のみ。辞書は
+  `tools/get-sano-dict.sh` で取得し `make flash BOARD=cores3-dict` が書き込む。
 - **NeoPixel**: nekomimi 用 LED ストリップ アニメーション (虹 / 単色 / リップシンク
   レベルメーター モード)。
 - **LT タイマー**: 発表時間アシスト。残り N 秒で予告 → 時刻ぴったり → 超過繰返し
@@ -132,7 +139,7 @@ OpenAI / Gemini の API キーはビルドに埋め込まず、BLE / Wi-Fi 設�
 
 ## 起動シーケンス (CoreS3 標準パス)
 
-1. M5 / Avatar 初期化、起動音 (ドレミファソ C5–D5–E5–F5–G5、設定で OFF 可)
+1. M5 / Avatar 初期化、起動音 (ドレミファソ、既定 OFF・設定で ON 可)
 2. NVS から設定読み込み → BLE 設定サービス起動 (常時 advertising)
 3. SSID があれば Wi-Fi STA 接続を非ブロッキング開始
    - STA 接続後 → mDNS + HTTP 設定サーバー + SNTP 開始
@@ -171,7 +178,7 @@ OpenAI / Gemini の API キーはビルドに埋め込まず、BLE / Wi-Fi 設�
 ├── assets/                 .avdsl ソース (default_face, omega_mouth, aokko_face, purin_face)、
 │                           voices/ (HMM ボイス)、sanotts/ (sanoTTS 重み + NOTICE)
 ├── partitions.csv          OTA 配置 (ota_0 / ota_1 / nvs / storage)
-├── sdkconfig.defaults*     共通 + ボード別 (.cores3 / .atoms3r / .atoms3 / .stopwatch)
+├── sdkconfig.defaults*     共通 + ボード別 (.cores3 / .cores3-dict / .atoms3r / .atoms3 / .stopwatch)
 └── Makefile                idf.py の薄いラッパ (BOARD= 切替)
 ```
 

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
 // SPDX-License-Identifier: BSL-1.0
 
+#include "avatar/jp_font.hpp"
 #include "ap_screen.hpp"
 
 #include <atomic>
@@ -156,8 +157,8 @@ bool draw(M5GFX& display)
 
     // Title — skipped on the tiny panel (no space).
     if (!tiny) {
-        display.setFont(round_ ? &fonts::lgfxJapanGothic_24
-                                : &fonts::lgfxJapanGothic_16);
+        display.setFont(round_ ? stackchan::avatar::jp_font_24()
+                                : stackchan::avatar::jp_font_16());
         display.setTextColor(TFT_BLACK, TFT_WHITE);
         display.setTextDatum(lgfx::textdatum_t::top_center);
         display.drawString("Wi-Fi 設定モード", W / 2, top_margin);
@@ -169,8 +170,8 @@ bool draw(M5GFX& display)
 
     // Caption block between the QR and the exit button.
     if (!tiny) {
-        display.setFont(round_ ? &fonts::lgfxJapanGothic_20
-                                : &fonts::lgfxJapanGothic_12);
+        display.setFont(round_ ? stackchan::avatar::jp_font_20()
+                                : stackchan::avatar::jp_font_12());
         display.setTextColor(TFT_BLACK, TFT_WHITE);
         display.setTextDatum(lgfx::textdatum_t::top_center);
         int ty = qr_y + qr_w + 4;
@@ -199,8 +200,8 @@ bool draw(M5GFX& display)
     if (btn_w > 0 && btn_h > 0) {
         const std::uint16_t red = display.color565(200, 90, 60);
         display.fillRoundRect(btn_x, btn_band_y, btn_w, btn_h, 6, red);
-        display.setFont(round_ ? &fonts::lgfxJapanGothic_20
-                                : &fonts::lgfxJapanGothic_16);
+        display.setFont(round_ ? stackchan::avatar::jp_font_20()
+                                : stackchan::avatar::jp_font_16());
         display.setTextColor(TFT_WHITE, red);
         display.setTextDatum(lgfx::textdatum_t::middle_center);
         display.drawString("終了 (AP モード停止)",

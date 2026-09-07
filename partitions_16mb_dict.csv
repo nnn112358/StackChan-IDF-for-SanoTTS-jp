@@ -1,0 +1,15 @@
+# ESP-IDF Partition Table (16 MB flash、cores3-dict: 端末内漢字 G2P の辞書入り slim 構成)
+#
+# 辞書 k1-dict-438750.bin (13,702,320 B) を置くため OTA (アプリ 2 面) と storage / voice /
+# model を捨てた単一アプリ表。nvs / phy_init は共通表と同じオフセット (設定は引き継がれる)。
+# otadata は無い (CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=n)。この表への移行と辞書の書き込みは
+# USB 経由 (`make flash BOARD=cores3-dict`)。
+#   factory  0x10000  0x230000 (2.19 MiB) — アプリの上限。超えたら sdkconfig.defaults.cores3-dict で機能を削る
+#   sano     0x240000 0xA0000  (640 KiB)  — sanoTTS 重み 654,032 B
+#   dict     0x2E0000 0xD20000 (13.1 MiB) — 辞書 (64 KB 境界に置くこと。mmap のページ境界)
+# Name,   Type, SubType, Offset,   Size,     Flags
+nvs,      data, nvs,     0x9000,   0x4000,
+phy_init, data, phy,     0xf000,   0x1000,
+factory,  app,  factory, 0x10000,  0x230000,
+sano,     data, 0x41,    0x240000, 0xA0000,
+dict,     data, 0x41,    0x2E0000, 0xD20000,

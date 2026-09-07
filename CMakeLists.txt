@@ -16,3 +16,16 @@ if(CONFIG_JTTS_ENABLE_SANO)
         message(WARNING "sanoTTS: 重み blob が無い (${SANO_MODEL_BLOB})。sano エンジンはフォールバック動作になる")
     endif()
 endif()
+
+# --- 端末内漢字 G2P の辞書 (cores3-dict) を `dict` パーティションに焼く -----------------
+# assets/sanotts/k1-dict-438750.bin (13,702,320 B、sanoTTS-jp Release v0.3.0、修正 BSD —
+# assets/sanotts/NOTICE-dictionary.txt)。git には入れない: tools/get-sano-dict.sh で取る。
+if(CONFIG_JTTS_SANO_KANJI)
+    set(SANO_DICT_BLOB "${CMAKE_CURRENT_LIST_DIR}/assets/sanotts/k1-dict-438750.bin")
+    if(EXISTS "${SANO_DICT_BLOB}")
+        esptool_py_flash_to_partition(flash "dict" "${SANO_DICT_BLOB}")
+        message(STATUS "sanoTTS: ${SANO_DICT_BLOB} → dict パーティション (flash 時に書き込み)")
+    else()
+        message(WARNING "sanoTTS: 辞書 blob が無い (${SANO_DICT_BLOB})。tools/get-sano-dict.sh で取得すること。漢字入力は使えない")
+    endif()
+endif()

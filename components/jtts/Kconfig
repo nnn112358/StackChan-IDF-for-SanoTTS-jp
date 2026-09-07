@@ -19,6 +19,18 @@ config JTTS_ENABLE_SANO
         合成の作業領域 176 KB は既定で PSRAM (JTTS_SANO_ARENA_INTERNAL 参照)。
         無効時は render_sano がスタブになり推論コアはリンクされない。
 
+config JTTS_SANO_KANJI
+    bool "sanoTTS: on-device kanji G2P (Open JTalk + 13.7 MB dictionary partition)"
+    default n
+    depends on JTTS_ENABLE_SANO
+    help
+        漢字かな交じり文をそのまま読めるようにする (sanoTTS-jp 上流の端末内 G2P:
+        辞書 k1-dict-438750.bin を `dict` パーティションに焼いて mmap し、Open JTalk の
+        NJD 鎖で読みとアクセントを付ける)。flash に 13.7 MB 要るので、OTA 無しの
+        単一アプリ構成 (BOARD=cores3-dict、partitions_16mb_dict.csv) 専用。
+        1 文あたり Open JTalk が PSRAM を最大 ~105 KB 使う。辞書は枝刈りしてあるので
+        フル辞書と読みが変わる文がある (上流実測 17.79%、地名・固有名詞)。
+
 config JTTS_SANO_SPEED_PCT
     int "sanoTTS: duration scale correction [%] (100 = model default, larger = slower)"
     default 125

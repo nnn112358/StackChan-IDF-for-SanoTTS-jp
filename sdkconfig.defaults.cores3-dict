@@ -1,0 +1,40 @@
+# M5Stack CoreS3 — 「辞書入り slim」プロファイル (`make build BOARD=cores3-dict`)。
+#
+# sanoTTS-jp の端末内漢字 G2P (Open JTalk + 辞書 13.7 MB) を載せるために、flash を
+# 単一アプリ (2.19 MiB) + sanoTTS 重み + 辞書に割り直した構成 (partitions_16mb_dict.csv)。
+# 代償: OTA 無し (更新は USB)、会話 (OpenAI/Gemini)、BLE/Wi-Fi オーディオ ストリーム、
+# カメラ、esp-sr ASR、HMM ボイス、ESP-NOW、日本語フォント 1 サイズ (16 px) 化、-Os。
+# 残るもの: 顔 / サーボ / Wi-Fi 設定ページ + HTTP API (/api/jtts-say で漢字文 OK) /
+# BLE 設定 / LT タイマー / ダンス / sanoTTS (かな + 漢字)。
+
+# --- ハードウェア (cores3 と同じ) ---
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# --- パーティション: 単一アプリ + sano + dict ---
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_16mb_dict.csv"
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=n
+
+# --- サイズ優先 (推論コアだけ -O2、components/saanotts_core/CMakeLists.txt) ---
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_COMPILER_OPTIMIZATION_PERF=n
+
+# --- 外す機能 ---
+CONFIG_STACKCHAN_CONVERSATION_ENABLED=n
+CONFIG_STACKCHAN_AUDIO_STREAM_ENABLED=n
+CONFIG_STACKCHAN_WIFI_AUDIO_ENABLED=n
+CONFIG_STACKCHAN_ESPNOW_REMOTE_ENABLED=n
+CONFIG_STACKCHAN_CAMERA_ENABLED=n
+CONFIG_STACKCHAN_ASR_ENABLED=n
+CONFIG_JTTS_ENABLE_HMM=n
+CONFIG_STACKCHAN_JP_FONT_16_ONLY=y
+
+# --- sanoTTS: かな + 漢字 (辞書)。arena は内部 DRAM を先に試す (空いていれば xRT 0.45) ---
+CONFIG_JTTS_ENABLE_SANO=y
+CONFIG_JTTS_SANO_KANJI=y
+CONFIG_JTTS_SANO_ARENA_INTERNAL=y
+CONFIG_STACKCHAN_CORES3_SPK_BOOST_MV=0
+
+# main タスクは hts_engine 用に 16 KB にしていたが、HMM 無しなので共通既定 (8 KB) に戻る。

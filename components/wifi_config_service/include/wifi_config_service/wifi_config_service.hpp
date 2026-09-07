@@ -165,6 +165,7 @@ void set_hmm_voice_status_getter(HmmVoiceStatusGetter getter);
 //                          {"loaded":bool,"capacity":u32 (0 = パーティションなし)}。
 struct SanoModelStatus {
     bool loaded = false;
+    bool dict = false;  // 端末内漢字 G2P の辞書あり (cores3-dict)
     std::uint32_t capacity = 0;
 };
 using SanoModelStatusGetter = std::function<SanoModelStatus()>;

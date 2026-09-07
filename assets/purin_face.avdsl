@@ -28,16 +28,16 @@
 -- 眉: 目の内側上 (bx, 50..70) から外側の先端 (tip_x, tip_y) へ伸びる三角形。
 -- dir = +1 で先端が右 (画面右の眉)、-1 で左。SAD では向きを反転して困り眉に。
 ----------------------------------------------------------------------
-fn eyebrow(bx, tip_x, tip_y, dir, color)
+fn eyebrow(bx, tip_x, tip_y, dir, color, dy)
   let base_x = tx(bx)
-  let top_y = ty(50)
-  let bot_y = ty(70)
+  let top_y = ty(50 + dy)
+  let bot_y = ty(70 + dy)
   let px = tx(tip_x)
-  let py = ty(tip_y)
+  let py = ty(tip_y + dy)
   if expr == SAD then
     -- 先端を目の上 (内側寄り) に折り返す: 眉尻が下がった困り顔
     px = tx(bx + dir * 20)
-    py = ty(40)
+    py = ty(40 + dy)
   end
   -- bbox: 三角形の外接矩形 + 震え (x 0..10 / y 0..15) と SAD の折り返しぶんの余白
   let pad = sz(16)
@@ -83,6 +83,8 @@ end
 fn draw()
   let bg = 0x07FF      -- シアン (原作の赤 0xF800 から変更)
   let black = 0x0000
+  -- 吹き出し (画面下 ~48 px) と口が重ならないよう顔全体を上にずらす (設計座標)。
+  let dy = -30
 
   -- 擬似乱数 (原作の random(10) / random(15) / random(5) 相当)。
   -- 50 ms ごとのフレーム番号を 1000 で畳み、素数を掛けて剰余を取る。
@@ -103,16 +105,17 @@ fn draw()
   end_group()
 
   -- 口 (133..193 × 188 中心)。mouth_off で微調整
-  mouth(tx(163 + mouth_off_x), ty(188 + mouth_off_y), sz(60), sz(4), sz(48), black)
+  mouth(tx(163 + mouth_off_x), ty(188 + mouth_off_y + dy), sz(60), sz(4), sz(48), black)
 
   -- 目 (90, 93) / (230, 93)、r = 25。震え 0..5 px
   let r = sz(25)
-  eye(tx(90  - eye_off_x + je_x1), ty(93 + eye_off_y + je_y1), r, black, bg)
-  eye(tx(230 + eye_off_x + je_x2), ty(93 + eye_off_y + je_y2), r, black, bg)
+  eye(tx(90  - eye_off_x + je_x1), ty(93 + eye_off_y + je_y1 + dy), r, black, bg)
+  eye(tx(230 + eye_off_x + je_x2), ty(93 + eye_off_y + je_y2 + dy), r, black, bg)
 
-  -- 眉 (怒り眉)。画面右: (190, 50..70) → (280+j, 25+j)、画面左: (130, 50..70) → (50+j, 25+j)
+  -- 眉 (怒り眉)。画面右: (190, 50..70) → (280+j, 35+j)、画面左: (130, 50..70) → (50+j, 35+j)
+  -- (原作の先端 y=25 は dy で上げると画面外に出るので 35 に)
   if eyebrows_visible then
-    eyebrow(190 + brow_off_x, 280 + brow_off_x + jb_x1, 25 + brow_off_y + jb_y1,  1, black)
-    eyebrow(130 - brow_off_x,  50 - brow_off_x + jb_x2, 25 + brow_off_y + jb_y2, -1, black)
+    eyebrow(190 + brow_off_x, 280 + brow_off_x + jb_x1, 35 + brow_off_y + jb_y1,  1, black, dy)
+    eyebrow(130 - brow_off_x,  50 - brow_off_x + jb_x2, 35 + brow_off_y + jb_y2, -1, black, dy)
   end
 end

@@ -220,6 +220,12 @@ void start_say_worker(std::string_view kana_utf8)
     const BaseType_t rc = xTaskCreatePinnedToCoreWithCaps(
         +[](void* arg) {
             std::unique_ptr<std::string> kana_text{static_cast<std::string*>(arg)};
+            // 試験用フック: 先頭 `!` でストリーミングを使わず一括合成→再生 (A/B 比較用)。
+            bool force_blocking = false;
+            if (!kana_text->empty() && (*kana_text)[0] == '!') {
+                force_blocking = true;
+                kana_text->erase(0, 1);
+            }
             std::u32string kana = stackchan::app::decode_utf8(*kana_text);
             if (kana.empty()) {
                 ESP_LOGW(kTag, "say: empty / invalid utf8");
@@ -245,7 +251,8 @@ void start_say_worker(std::string_view kana_utf8)
             };
             // sanoTTS はストリーミング (合成しながら再生 + リップシンク)。モデル無し /
             // 読めない / 長すぎるときは false なので、従来の一括経路 (他エンジン) に落とす。
-            if ((opt.engine == stackchan::jtts::Engine::Auto || opt.engine == stackchan::jtts::Engine::Sano) &&
+            if (!force_blocking &&
+                (opt.engine == stackchan::jtts::Engine::Auto || opt.engine == stackchan::jtts::Engine::Sano) &&
                 stackchan::app::speak_streaming(kana, opt, g_state)) {
                 finish();
                 return;
@@ -508,7 +515,7 @@ void register_avatar_bytecode_sinks()
     stackchan::wifi_config::set_sano_model_status_getter(
         []() -> stackchan::wifi_config::SanoModelStatus {
             const auto st = sano_model::status();
-            return {st.loaded, st.capacity};
+            return {st.loaded, st.dict, st.capacity};
         });
 }
 

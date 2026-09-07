@@ -50,6 +50,9 @@ extern "C" {
 #include "g2p.h"
 #include "saanotts.h"
 #include "saanotts_stream.h"
+#if defined(SAAN_KANJI) && SAAN_KANJI
+#include "saan_kanji.h"
+#endif
 }
 
 #if defined(ESP_PLATFORM)
@@ -109,10 +112,16 @@ constexpr float kDefaultGain = 0.6f;
 struct Model {
     saan_weights weights{};
     bool loaded = false;
+    const void* dict = nullptr;  // jdict_t* (CONFIG_JTTS_SANO_KANJI のときだけ非 null になりうる)
     // 重みの差し替え (将来の HTTP アップロード) と合成を直列化する。合成は数秒保持する。
     std::mutex mutex;
 };
 Model g_model;
+
+#if defined(SAAN_KANJI) && SAAN_KANJI
+// 漢字 G2P の作業領域 (Viterbi 48 KB + 固定長配列 + label_ids の表) が合成 arena に収まること。
+static_assert(kArenaBytes >= SAAN_KANJI_WORKBYTES, "sanoTTS arena is too small for the kanji G2P");
+#endif
 
 // ---- arena ----------------------------------------------------------------
 
@@ -156,8 +165,73 @@ ArenaPtr alloc_arena() {
 
 // ---- 段階ごとの処理 ---------------------------------------------------------
 
+bool ids_ok(std::int32_t n_ids, std::vector<std::int32_t>& ids) {
+    if (n_ids <= 3) return false;  // ^ _ $ だけ = 読める音が無い
+    if (n_ids > kMaxIds) {
+        SANO_LOGW("%d ids exceeds %d (split the text) — falling back", static_cast<int>(n_ids),
+                  static_cast<int>(kMaxIds));
+        return false;
+    }
+    ids.resize(static_cast<std::size_t>(n_ids));
+    return true;
+}
+
+// 辞書経路が要るか: かな中間表現にできない文字 (漢字・英数字など) を含むとき。
+// カタカナ・約物・空白・アクセント記号だけならかな経路で足りる。
+bool needs_dictionary(std::u32string_view text) {
+    std::string inter;
+    std::size_t skipped = 0;
+    internal::build_sano_intermediate(text, inter, &skipped);
+    return skipped > 0;
+}
+
+#if defined(SAAN_KANJI) && SAAN_KANJI
+// 漢字かな交じり文 → ids (Open JTalk)。jtts のアクセント記号 (' /) と sanoTTS の記号は落とし、
+// UTF-8 の生文字列をそのまま辞書に渡す (句読点は Open JTalk が解釈する)。
+bool kanji_to_ids(std::u32string_view text, std::vector<std::int32_t>& ids, std::uint8_t* arena) {
+    std::string utf8;
+    for (char32_t c : text) {
+        if (c == U'\'' || c == U'’' || c == U'/' || c == U'[' || c == U']' || c == U'#' || c == U'_' ||
+            c == U'^' || c == U'$' || c == U'°') {
+            continue;
+        }
+        // append UTF-8
+        if (c < 0x80) utf8.push_back(static_cast<char>(c));
+        else if (c < 0x800) { utf8.push_back(static_cast<char>(0xC0 | (c >> 6))); utf8.push_back(static_cast<char>(0x80 | (c & 0x3F))); }
+        else if (c < 0x10000) { utf8.push_back(static_cast<char>(0xE0 | (c >> 12))); utf8.push_back(static_cast<char>(0x80 | ((c >> 6) & 0x3F))); utf8.push_back(static_cast<char>(0x80 | (c & 0x3F))); }
+        else { utf8.push_back(static_cast<char>(0xF0 | (c >> 18))); utf8.push_back(static_cast<char>(0x80 | ((c >> 12) & 0x3F))); utf8.push_back(static_cast<char>(0x80 | ((c >> 6) & 0x3F))); utf8.push_back(static_cast<char>(0x80 | (c & 0x3F))); }
+    }
+    if (utf8.empty()) return false;
+    const std::int32_t cap = saan_g2p_capacity(utf8.size());
+    ids.assign(static_cast<std::size_t>(cap), 0);
+    std::int32_t n_ids = 0;
+    int n_tok = 0;
+    const auto t0 = std::chrono::steady_clock::now();
+    const saan_kanji_status ks = saan_kanji_to_ids(static_cast<const jdict_t*>(g_model.dict), utf8.data(), utf8.size(),
+                                                   arena, kArenaBytes, ids.data(), cap, &n_ids, &n_tok);
+    const auto t1 = std::chrono::steady_clock::now();
+    if (ks != SAAN_KANJI_OK) {
+        SANO_LOGW("kanji g2p failed: %s for \"%s\"", saan_kanji_strerror(ks), utf8.c_str());
+        return false;
+    }
+    SANO_LOGI("kanji g2p: %u B → %d morphemes → %d ids (%ld ms)", static_cast<unsigned>(utf8.size()), n_tok,
+              static_cast<int>(n_ids),
+              static_cast<long>(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()));
+    return ids_ok(n_ids, ids);
+}
+#endif
+
 // 読み → 音素 ID 列。読めない / 空 / 長すぎるは false。
-bool text_to_ids(std::u32string_view text, std::vector<std::int32_t>& ids) {
+// 辞書があり漢字などを含む読みは辞書経路 (arena を Viterbi の作業領域に借りる)、
+// それ以外はかな中間表現 G2P。
+bool text_to_ids(std::u32string_view text, std::vector<std::int32_t>& ids, std::uint8_t* arena) {
+#if defined(SAAN_KANJI) && SAAN_KANJI
+    if (g_model.dict != nullptr && arena != nullptr && needs_dictionary(text)) {
+        return kanji_to_ids(text, ids, arena);
+    }
+#else
+    (void)arena;
+#endif
     std::string inter;
     std::size_t skipped = 0;
     if (!internal::build_sano_intermediate(text, inter, &skipped)) return false;
@@ -175,14 +249,7 @@ bool text_to_ids(std::u32string_view text, std::vector<std::int32_t>& ids) {
                   static_cast<int>(info.err_byte), inter.c_str());
         return false;
     }
-    if (n_ids <= 3) return false;  // ^ _ $ だけ = 読める音が無い
-    if (n_ids > kMaxIds) {
-        SANO_LOGW("%d ids exceeds %d (split the text) — falling back", static_cast<int>(n_ids),
-                  static_cast<int>(kMaxIds));
-        return false;
-    }
-    ids.resize(static_cast<std::size_t>(n_ids));
-    return true;
+    return ids_ok(n_ids, ids);
 }
 
 float tempo_scale(float mora_ms) {
@@ -199,15 +266,10 @@ struct Synthesized {
     std::uint64_t checksum = 1469598103934665603ull;
 };
 
-// ids → 22.05 kHz float PCM。合成中は arena を握る。
-bool synthesize_pcm(const std::vector<std::int32_t>& ids, float s_v, Synthesized& out) {
-    ArenaPtr arena = alloc_arena();
-    if (!arena) {
-        SANO_LOGW("arena %u B alloc failed", static_cast<unsigned>(kArenaBytes));
-        return false;
-    }
+// ids → 22.05 kHz float PCM。arena は呼び出し側が渡す (G2P と共用)。
+bool synthesize_pcm(const std::vector<std::int32_t>& ids, float s_v, std::uint8_t* arena_buf, Synthesized& out) {
     saan_arena a;
-    saan_arena_init(&a, arena.get(), kArenaBytes);
+    saan_arena_init(&a, arena_buf, kArenaBytes);
 
     const auto n_ids = static_cast<std::int32_t>(ids.size());
     saan_stream st;
@@ -272,12 +334,17 @@ bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const
     std::lock_guard<std::mutex> lock(g_model.mutex);
     if (!g_model.loaded) return false;
 
+    ArenaPtr arena = alloc_arena();
+    if (!arena) {
+        SANO_LOGW("arena %u B alloc failed", static_cast<unsigned>(kArenaBytes));
+        return false;
+    }
     std::vector<std::int32_t> ids;
-    if (!text_to_ids(text, ids)) return false;
+    if (!text_to_ids(text, ids, arena.get())) return false;
 
     const auto t0 = std::chrono::steady_clock::now();
     Synthesized synth;
-    if (!synthesize_pcm(ids, SAAN_S_V * tempo_scale(opt.mora_ms), synth)) return false;
+    if (!synthesize_pcm(ids, SAAN_S_V * tempo_scale(opt.mora_ms), arena.get(), synth)) return false;
     const auto t1 = std::chrono::steady_clock::now();
 
     // 既定はモデル本来の 22.05 kHz のまま (上流と同じ、リサンプル無し)。
@@ -334,12 +401,12 @@ bool SanoStream::begin(std::u32string_view kana, const Options& opt) {
     end();
     std::unique_lock<std::mutex> lock(g_model.mutex);
     if (!g_model.loaded) return false;
-    if (!text_to_ids(kana, impl_->ids)) return false;
     impl_->arena = alloc_arena();
     if (!impl_->arena) {
         SANO_LOGW("arena %u B alloc failed", static_cast<unsigned>(kArenaBytes));
         return false;
     }
+    if (!text_to_ids(kana, impl_->ids, impl_->arena.get())) return false;
     saan_arena_init(&impl_->a, impl_->arena.get(), kArenaBytes);
     const auto n_ids = static_cast<std::int32_t>(impl_->ids.size());
     const float s_v = SAAN_S_V * tempo_scale(opt.mora_ms);
@@ -425,6 +492,26 @@ bool sano_model_loaded() {
     return g_model.loaded;
 }
 
+bool set_sano_dict(const void* jdict) {
+#if defined(SAAN_KANJI) && SAAN_KANJI
+    std::lock_guard<std::mutex> lock(g_model.mutex);
+    g_model.dict = jdict;
+    if (jdict != nullptr && saan_kanji_init() == 0) {
+        g_model.dict = nullptr;
+        return false;
+    }
+    return true;
+#else
+    (void)jdict;
+    return false;
+#endif
+}
+
+bool sano_dict_loaded() {
+    std::lock_guard<std::mutex> lock(g_model.mutex);
+    return g_model.dict != nullptr;
+}
+
 }  // namespace stackchan::jtts
 
 #else  // !JTTS_SANO_AVAILABLE — スタブ (推論コアをリンクしない)
@@ -433,6 +520,8 @@ namespace stackchan::jtts {
 
 bool set_sano_model(std::span<const std::uint8_t>) { return false; }
 bool sano_model_loaded() { return false; }
+bool set_sano_dict(const void*) { return false; }
+bool sano_dict_loaded() { return false; }
 
 struct SanoStream::Impl {};
 SanoStream::SanoStream() = default;
