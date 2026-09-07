@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,16 @@ namespace stackchan::app {
 // voice / pitch / mora / formant settings as the demo_loop babble.
 jtts::Options resolve_speech_options(const std::string& json,
                                      std::uint32_t sample_rate);
+
+// Build the avatar mouth envelope for a PCM clip: one value per `step_ms`
+// window = the window's peak amplitude, **normalised to the loudest window
+// of the clip** (so a quiet engine like sanoTTS, whose raw peak is ~0.3, still
+// opens the mouth fully — same idea as the reference SanoTTS-jp-M5StackCoreS3
+// lip sync). Windows below a small floor are forced to 0 so breath noise
+// doesn't make the mouth tremble. Shared by Speech::say and the /api/jtts-say
+// worker (main/settings_sinks.cpp).
+std::vector<float> build_mouth_envelope(std::span<const std::int16_t> pcm,
+                                        std::uint32_t sample_rate, std::uint32_t step_ms);
 
 // Synthesises a short "babble" speech-like utterance and plays it through
 // M5.Speaker. While the clip is playing, `current_mouth_open()` returns the

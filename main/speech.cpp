@@ -97,18 +97,20 @@ void apply_engine(jtts::Options& opt, const cJSON* item)
     }
 }
 
-void build_envelope_from_pcm(const std::vector<std::int16_t>& pcm,
-                             std::vector<float>& envelope, std::uint32_t sample_rate,
-                             std::uint32_t step_ms)
+} // namespace
+
+std::vector<float> build_mouth_envelope(std::span<const std::int16_t> pcm,
+                                        std::uint32_t sample_rate, std::uint32_t step_ms)
 {
+    std::vector<float> envelope;
     const std::size_t window =
         static_cast<std::size_t>(sample_rate) * static_cast<std::size_t>(step_ms) / 1000u;
     if (window == 0 || pcm.empty()) {
-        envelope.clear();
-        return;
+        return envelope;
     }
     const std::size_t windows = (pcm.size() + window - 1) / window;
     envelope.assign(windows, 0.0f);
+    float max_peak = 0.0f;
     for (std::size_t w = 0; w < windows; ++w) {
         const std::size_t begin = w * window;
         const std::size_t end = std::min(begin + window, pcm.size());
@@ -117,8 +119,24 @@ void build_envelope_from_pcm(const std::vector<std::int16_t>& pcm,
             peak = std::max(peak, std::abs(static_cast<std::int32_t>(pcm[i])));
         }
         envelope[w] = static_cast<float>(peak) / 32767.0f;
+        max_peak = std::max(max_peak, envelope[w]);
     }
+    // Normalise to the loudest window (guard near-silent clips: keep them
+    // closed instead of amplifying noise), then floor the quiet windows.
+    constexpr float kMinClipPeak = 0.02f;
+    constexpr float kFloor = 0.08f;
+    if (max_peak < kMinClipPeak) {
+        std::fill(envelope.begin(), envelope.end(), 0.0f);
+        return envelope;
+    }
+    for (float& v : envelope) {
+        v /= max_peak;
+        if (v < kFloor) v = 0.0f;
+    }
+    return envelope;
 }
+
+namespace {
 
 // Pull voice / pitch / mora / formant / gain / vibrato out of a JSON
 // blob into a jtts::Options. Missing fields stay at the input defaults
@@ -251,7 +269,7 @@ bool Speech::say(std::u32string_view reading)
     }
     rate_hz_ = rate;  // sanoTTS returns its native 22.05 kHz
 
-    build_envelope_from_pcm(pcm_, envelope_, rate, kEnvelopeStepMs);
+    envelope_ = build_mouth_envelope(pcm_, rate, kEnvelopeStepMs);
 
     duration_ms_.store(
         static_cast<std::uint32_t>(static_cast<float>(pcm_.size()) * 1000.0f /

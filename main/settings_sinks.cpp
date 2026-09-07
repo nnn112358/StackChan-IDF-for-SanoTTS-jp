@@ -16,6 +16,7 @@
 #include <M5Unified.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/idf_additions.h>
 #include <freertos/task.h>
@@ -221,9 +222,25 @@ void start_say_worker(std::string_view kana_utf8)
                 vTaskDeleteWithCaps(nullptr);
                 return;
             }
+            // Lip sync: drive the avatar mouth from the clip's envelope while it
+            // plays (same envelope as Speech::say). Nothing else writes
+            // face.mouth_open in this state — demo_loop only does so with idle
+            // babble on, and mic lip-sync / conversation own it in their modes.
+            const std::vector<float> envelope = stackchan::app::build_mouth_envelope(
+                pcm, rate, stackchan::app::Speech::kEnvelopeStepMs);
             while (M5.Speaker.isPlaying()) vTaskDelay(pdMS_TO_TICKS(20));
+            const std::int64_t t0_us = esp_timer_get_time();
             M5.Speaker.playRaw(pcm.data(), pcm.size(), rate, /*stereo=*/false);
-            while (M5.Speaker.isPlaying()) vTaskDelay(pdMS_TO_TICKS(20));
+            while (M5.Speaker.isPlaying()) {
+                if (g_state != nullptr && !envelope.empty()) {
+                    const auto elapsed_ms = static_cast<std::uint32_t>((esp_timer_get_time() - t0_us) / 1000);
+                    const std::size_t idx = elapsed_ms / stackchan::app::Speech::kEnvelopeStepMs;
+                    g_state->face.mouth_open.store(idx < envelope.size() ? envelope[idx] : 0.0f,
+                                                   std::memory_order_relaxed);
+                }
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+            if (g_state != nullptr) g_state->face.mouth_open.store(0.0f, std::memory_order_relaxed);
             stackchan::wifi_config::mcp_events::publish_say_done();
             vTaskDeleteWithCaps(nullptr);
         },
