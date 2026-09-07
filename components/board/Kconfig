@@ -71,4 +71,16 @@ menu "Stack-chan board"
 
     endif # STACKCHAN_CAMERA_ENABLED
 
+    config STACKCHAN_CORES3_SPK_BOOST_MV
+        int "CoreS3 speaker amp (AW88298) boost voltage [mV] (0 = off)"
+        default 5000
+        range 0 10250
+        help
+            CoreS3 内蔵アンプ AW88298 の Smart Boost 2 モードの最大出力電圧 [mV]
+            (5000〜10250、125 mV 刻み)。0 で M5Unified 既定の Transparent モード
+            (ブースト無し = VDD をそのままアンプ電源に。ピーク 0.3 程度で割れる)。
+            ブーストを入れるとアンプ電源が上がり、同じデジタル レベルでも歪まない。
+            消費電流は増えるので、USB 給電 / バッテリで不安定なら下げるか 0 に戻す。
+            patches/m5unified.patch のフック経由で Speaker.begin() のたびに書かれる。
+
 endmenu

@@ -1,5 +1,30 @@
+diff --git a/src/M5Unified.cpp b/src/M5Unified.cpp
+index ddecd2d..d2b5572 100644
+--- a/src/M5Unified.cpp
++++ b/src/M5Unified.cpp
+@@ -416,6 +416,8 @@ static constexpr const uint8_t _pin_table_mbus[][31] = {
+   static constexpr uint8_t aw88298_i2c_addr = 0x36;
+   static constexpr uint8_t aw9523_i2c_addr = 0x58;
+   static constexpr uint8_t powerhub_i2c_addr = 0x50;
++  extern "C" uint16_t __attribute__((weak)) m5unified_cores3_aw88298_bstctrl2(void) { return 0x0673; }
++
+   static void aw88298_write_reg(uint8_t reg, uint16_t value)
+   {
+     value = __builtin_bswap16(value);
+@@ -472,7 +474,10 @@ static constexpr const uint8_t _pin_table_mbus[][31] = {
+       while (rate > rate_tbl[reg0x06_value] && ++reg0x06_value < sizeof(rate_tbl)) {}
+ 
+       reg0x06_value |= 0x14C0;  // I2SBCK=0 (BCK mode 16*2)
+-      aw88298_write_reg( 0x61, 0x0673 );  // boost mode disabled 
++      // stackchan-idf patch: let the application choose the AW88298 boost setting
++      // (BSTCTRL2). Upstream hard-codes 0x0673 = transparent mode (no boost);
++      // the weak default below keeps that, components/board overrides it.
++      aw88298_write_reg( 0x61, m5unified_cores3_aw88298_bstctrl2() );
+       aw88298_write_reg( 0x04, 0x4040 );  // I2SEN=1 AMPPD=0 PWDN=0
+       aw88298_write_reg( 0x05, 0x0008 );  // RMSE=0 HAGCE=0 HDCCE=0 HMUTE=0
+       aw88298_write_reg( 0x06, reg0x06_value );
 diff --git a/src/utility/Speaker_Class.cpp b/src/utility/Speaker_Class.cpp
-index e4094b9..6c9f42e 100644
+index d65fc4f..158f509 100644
 --- a/src/utility/Speaker_Class.cpp
 +++ b/src/utility/Speaker_Class.cpp
 @@ -969,6 +969,17 @@ label_continue_sample:

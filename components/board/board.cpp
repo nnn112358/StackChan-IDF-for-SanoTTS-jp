@@ -332,3 +332,22 @@ bool Board::vibrate(std::uint32_t duration_ms)
 }
 
 } // namespace stackchan::board
+
+// --- CoreS3 AW88298 boost (BSTCTRL2) ---------------------------------------
+// M5Unified (patches/m5unified.patch) calls this weak-overridable hook every
+// time it enables the CoreS3 speaker amp. Upstream writes 0x0673 = BST_MODE
+// 000 (transparent, amp rail = VDD), which clips around 0.3 FS on the 1 W
+// speaker. We select Smart Boost 2 (BST_MODE 110, datasheet default) with the
+// configured VOUT_VREFSET (5.0 V = 0x0F, +125 mV/step, 10.25 V = 0x39), keeping
+// BST_TDEG (352 ms) and the reserved bits at their defaults (0x6640 mask).
+extern "C" std::uint16_t m5unified_cores3_aw88298_bstctrl2(void)
+{
+    constexpr int mv = CONFIG_STACKCHAN_CORES3_SPK_BOOST_MV;
+    if (mv <= 0) {
+        return 0x0673;  // transparent (M5Unified upstream behaviour)
+    }
+    int vref = 0x0F + (mv - 5000) / 125;
+    if (vref < 0x0F) vref = 0x0F;
+    if (vref > 0x39) vref = 0x39;
+    return static_cast<std::uint16_t>(0x6640 | vref);
+}
