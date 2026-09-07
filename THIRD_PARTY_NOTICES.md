@@ -88,6 +88,18 @@ firmware は任意の `.htsvoice` を読み込めます。以下はライセン�
 
 ---
 
+## 顔デザインの参照元
+
+### 「プリンを守る技術」の顔 — aNo研 (2019)
+
+`assets/purin_face.avdsl` (このフォークの組み込みデフォルト顔) は
+<https://github.com/anoken/purin_wo_mamoru_gijutsu/> の `draw_face()` (真っ赤な背景、
+黒い怒り眉 / 丸い目 / 矩形の口、毎フレームの震え) を参照して **Avatar DSL で書き直した**
+もの。参照したのは座標・色・形といった数値の事実だけで、上流のソース コードは
+持ち込んでいない (DSL の実装はこのリポジトリのオリジナル、BSL-1.0)。
+
+---
+
 ## テキスト解析 (ホスト側ツールのみ)
 
 `tools/jvox/`・`docs/jtts-hmm-research.md` の音声データ生成・検証は、ホスト上で

@@ -43,6 +43,9 @@ Pages サイトに反映されます。
 - **アバター描画**: M5GFX で 30 fps。呼吸 / saccade / blink、6 表情 (Neutral / Happy
   / Sad / Angry / Doubt / Sleepy)。**Avatar DSL** (`.avdsl` ソース → `.avbc` バイトコード)
   で顔のレイアウトとアニメーションを差し替え可能 (BLE / Wi-Fi 経由でライブ更新)。
+  このフォークの組み込みデフォルト顔は aNo研「プリンを守る技術」の真っ赤な顔
+  ([assets/purin_face.avdsl](assets/purin_face.avdsl)、`CONFIG_AVATAR_DEFAULT_FACE` で
+  切り替え)。スタックチャン標準の顔は設定ページのプリセット `default` から戻せる。
 - **マイク連動口パク (lip sync)**: FFT + 帯域 log + spectral flux で開口度推定、
   雑音床 EWMA AGC で環境ノイズに追従。
 - **サーボ**: SCS0009 yaw + pitch を UART1 (1 Mbps) で制御。台形速度
@@ -165,7 +168,7 @@ OpenAI / Gemini の API キーはビルドに埋め込まず、BLE / Wi-Fi 設�
 ├── patches/                upstream-targeted patches
 ├── tools/                  apply-m5-patches.sh, monitor_log.py, settings.html,
 │                           avatar_dsl/ (コンパイラ + WASM 連携)
-├── assets/                 .avdsl ソース (default_face, omega_mouth, aokko_face)、
+├── assets/                 .avdsl ソース (default_face, omega_mouth, aokko_face, purin_face)、
 │                           voices/ (HMM ボイス)、sanotts/ (sanoTTS 重み + NOTICE)
 ├── partitions.csv          OTA 配置 (ota_0 / ota_1 / nvs / storage)
 ├── sdkconfig.defaults*     共通 + ボード別 (.cores3 / .atoms3r / .atoms3 / .stopwatch)

@@ -57,11 +57,13 @@ set(_DSL_PRESETS
     "default=${PROJECT_DIR}/assets/default_face.avdsl"
     "omega=${PROJECT_DIR}/assets/omega_mouth.avdsl"
     "aokko=${PROJECT_DIR}/assets/aokko_face.avdsl"
+    "purin=${PROJECT_DIR}/assets/purin_face.avdsl"
 )
 set(_DSL_PRESET_FILES
     "${PROJECT_DIR}/assets/default_face.avdsl"
     "${PROJECT_DIR}/assets/omega_mouth.avdsl"
     "${PROJECT_DIR}/assets/aokko_face.avdsl"
+    "${PROJECT_DIR}/assets/purin_face.avdsl"
 )
 # The inject script depends on every JS source file it bundles, so rebuilds
 # pick up edits to the compiler. settings_common.js is inlined into the page

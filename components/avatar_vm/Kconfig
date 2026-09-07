@@ -1,0 +1,13 @@
+menu "Avatar (face VM)"
+
+config AVATAR_DEFAULT_FACE
+    string "Default face DSL (file name under assets/)"
+    default "default_face.avdsl"
+    help
+        firmware に埋め込むデフォルト顔の .avdsl (assets/ 直下のファイル名)。
+        ビルド時に tools/avatar_dsl/cli.mjs でコンパイルされ、NVS に顔が
+        無いときと POST /api/avatar-dsl/reset のときに使われる。
+        候補: default_face.avdsl (スタックチャン標準) / omega_mouth.avdsl /
+        aokko_face.avdsl / purin_face.avdsl (「プリンを守る技術」の真っ赤な顔)。
+
+endmenu

@@ -1,0 +1,117 @@
+-- SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
+-- SPDX-License-Identifier: BSL-1.0
+--
+-- 「プリンを守る技術」の顔 (aNo研、2019) をベースにした avatar_vm DSL の顔。
+--   出典: https://github.com/anoken/purin_wo_mamoru_gijutsu/ (draw_face(open))
+--   参照したのは座標・色・形 (数値の事実) だけで、コードは持ち込んでいない。
+--
+-- 原作の要素 (320×240):
+--   * 真っ赤な背景 (TFT_RED = 0xF800) に黒 (0x0000) のパーツ
+--   * 眉: 目の上から外側上方へ伸びる三角形 (怒り眉)。先端が毎フレーム震える
+--   * 目: 半径 25 の黒丸。位置が毎フレーム 0〜5 px 震える
+--   * 口: x 133〜193、y 188 を中心に高さ `open` の矩形 (2 つの三角形)
+--
+-- この移植での変更点:
+--   * 震えは `random()` が無いので now_ms から擬似乱数を作る (50 ms ごとに更新 =
+--     原作の delay(50) と同じ周期)
+--   * 口の高さは mouth_open (0..1) → 4〜48 px。原作は open=0 で口が消えるが、
+--     待機中も口が見えるよう最小 4 px の線を残す
+--   * まばたき (eye_open) と視線 (gaze_h / gaze_v) に追従。表情は
+--     HAPPY (目が ⌒)、SAD (眉の向きが逆)、SLEEPY (目が閉じ気味) だけ解釈し、
+--     それ以外は原作どおりの怒り眉
+--   * 全部 tx/ty/sz を通すので CoreS3 (320×240) 以外の画面でも同じ比率で出る
+--   * FaceTuning の eye_off / brow_off / mouth_off は位置の微調整として効く
+--     (色は原作どおり固定。FaceTuning の色設定は使わない)
+
+----------------------------------------------------------------------
+-- 眉: 目の内側上 (bx, 50..70) から外側の先端 (tip_x, tip_y) へ伸びる三角形。
+-- dir = +1 で先端が右 (画面右の眉)、-1 で左。SAD では向きを反転して困り眉に。
+----------------------------------------------------------------------
+fn eyebrow(bx, tip_x, tip_y, dir, color)
+  let base_x = tx(bx)
+  let top_y = ty(50)
+  let bot_y = ty(70)
+  let px = tx(tip_x)
+  let py = ty(tip_y)
+  if expr == SAD then
+    -- 先端を目の上 (内側寄り) に折り返す: 眉尻が下がった困り顔
+    px = tx(bx + dir * 20)
+    py = ty(40)
+  end
+  -- bbox: 三角形の外接矩形 + 震え (x 0..10 / y 0..15) と SAD の折り返しぶんの余白
+  let pad = sz(16)
+  let gx = min(base_x, px) - pad
+  let gy = min(top_y, py) - pad
+  let gw = abs(px - base_x) + pad * 2
+  let gh = max(bot_y, py) - gy + pad
+  begin_group(gx, gy, gw, gh)
+  fill_triangle(base_x, bot_y, base_x, top_y, px, py, color)
+  end_group()
+end
+
+----------------------------------------------------------------------
+-- 目: 半径 r の黒丸。閉じると太い横線、HAPPY は下半分を隠して ⌒ にする。
+----------------------------------------------------------------------
+fn eye(cx, cy, r, color, bg)
+  let ex = cx + gaze_h * sz(4)
+  let ey = cy + gaze_v * sz(4)
+  let half = r + sz(12)
+  begin_group(cx - half, cy - half, half * 2, half * 2)
+  if eye_open <= 0 or expr == SLEEPY then
+    fill_rect(ex - r, ey - sz(2), r * 2, sz(4), color)
+  else
+    fill_circle(ex, ey, r, color)
+    if expr == HAPPY then
+      fill_rect(ex - r - 1, ey, r * 2 + 3, r + 2, bg)
+      fill_circle(ex, ey, round(r / 1.5), bg)
+    end
+  end
+  end_group()
+end
+
+----------------------------------------------------------------------
+-- 口: 原作の 2 三角形 = 幅 60 の矩形。高さは mouth_open で 4..48 px。
+----------------------------------------------------------------------
+fn mouth(cx, cy, w, min_h, max_h, color)
+  let h = min_h + (max_h - min_h) * mouth_open
+  begin_group(cx - w / 2 - sz(2), cy - max_h / 2 - sz(2), w + sz(4), max_h + sz(4))
+  fill_rect(cx - w / 2, cy - h / 2, w, h, color)
+  end_group()
+end
+
+fn draw()
+  let red = 0xF800
+  let black = 0x0000
+
+  -- 擬似乱数 (原作の random(10) / random(15) / random(5) 相当)。
+  -- 50 ms ごとのフレーム番号を 1000 で畳み、素数を掛けて剰余を取る。
+  -- VM は float32 なので積が 2^24 (約 1,677 万) を超えない乗数にする。
+  let f = floor(now_ms / 50) % 1000
+  let jb_x1 = (f * 7919) % 10
+  let jb_y1 = (f * 6997) % 15
+  let jb_x2 = (f * 5003) % 10
+  let jb_y2 = (f * 3001) % 15
+  let je_x1 = (f * 1409) % 5
+  let je_y1 = (f * 2003) % 5
+  let je_x2 = (f * 4001) % 5
+  let je_y2 = (f * 9973) % 5
+
+  -- 背景: 原作の fillSprite(TFT_RED)。FaceTuning の背景色は使わない
+  begin_group(0, 0, canvas_w, canvas_h)
+  fill_rect(0, 0, canvas_w, canvas_h, red)
+  end_group()
+
+  -- 口 (133..193 × 188 中心)。mouth_off で微調整
+  mouth(tx(163 + mouth_off_x), ty(188 + mouth_off_y), sz(60), sz(4), sz(48), black)
+
+  -- 目 (90, 93) / (230, 93)、r = 25。震え 0..5 px
+  let r = sz(25)
+  eye(tx(90  - eye_off_x + je_x1), ty(93 + eye_off_y + je_y1), r, black, red)
+  eye(tx(230 + eye_off_x + je_x2), ty(93 + eye_off_y + je_y2), r, black, red)
+
+  -- 眉 (怒り眉)。画面右: (190, 50..70) → (280+j, 25+j)、画面左: (130, 50..70) → (50+j, 25+j)
+  if eyebrows_visible then
+    eyebrow(190 + brow_off_x, 280 + brow_off_x + jb_x1, 25 + brow_off_y + jb_y1,  1, black)
+    eyebrow(130 - brow_off_x,  50 - brow_off_x + jb_x2, 25 + brow_off_y + jb_y2, -1, black)
+  end
+end
