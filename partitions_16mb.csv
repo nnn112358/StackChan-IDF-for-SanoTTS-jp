@@ -12,5 +12,12 @@ ota_1,    app,  ota_1,   0x410000, 0x400000,
 storage,  data, spiffs,  0x810000, 0x100000,
 # HMM 合成の .htsvoice 置き場 (raw、先頭に hmm_voice のヘッダ)
 voice,    data, spiffs,  0x910000, 0x400000,
-# [ASR Phase0] esp-sr WakeNet/AFE モデル (camera off の cores3-asr 用)
-model,    data, spiffs,  0xd10000, 0x2e0000,
+# [ASR Phase0] esp-sr WakeNet/AFE モデル (camera off の cores3-asr 用)。
+# srmodels.bin は WakeNet 1 語で ~290 KB。末尾 1 MB を sano に譲った (offset は据え置き
+# なので書き込み済みのモデルはそのまま有効)。
+model,    data, spiffs,  0xd10000, 0x1e0000,
+# sanoTTS-jp の重み blob (raw、ヘッダ無し。assets/sanotts/saanotts-jp-v3-int8.bin
+# 654,032 B を `make flash` が書き込む。CONFIG_JTTS_ENABLE_SANO)。OTA では更新されない
+# ので、新しい表への移行と同様に USB 書き込みが要る。旧表の機体では見えず sano は
+# フォールバック動作。
+sano,     data, 0x41,    0xef0000, 0x100000,

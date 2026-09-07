@@ -47,6 +47,50 @@
   <li>ライセンス全文: <a href="https://github.com/ciniml/stackchan-idf/blob/main/components/hts_engine/COPYING" target="_blank" rel="noopener">components/hts_engine/COPYING</a></li>
 </ul>
 <blockquote>Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met … THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" …</blockquote>
+
+<h3>sanoTTS-jp 推論コア — MIT</h3>
+<p>蒸留ニューラル TTS の C99 推論コアとかな G2P (<code>components/saanotts_core/</code>、無改変で同梱)。</p>
+<ul>
+  <li>Copyright (c) 2026 yousan — MIT License</li>
+  <li>上流: <a href="https://github.com/ayutaz/sanoTTS-jp" target="_blank" rel="noopener">github.com/ayutaz/sanoTTS-jp</a></li>
+  <li>ライセンス全文: <a href="https://github.com/ciniml/stackchan-idf/blob/main/components/saanotts_core/LICENSE" target="_blank" rel="noopener">components/saanotts_core/LICENSE</a></li>
+</ul>
+</div>
+
+<div class="card">
+<h2>音声モデル (sanoTTS-jp 重み)</h2>
+<h3>sanoTTS-jp モデル v3 (int8) — sanoTTS-jp Model License 1.0</h3>
+<p>CoreS3 向け一括イメージ (<code>firmware-&lt;ver&gt;-cores3.bin</code>) に含まれ、<code>sano</code>
+パーティションに書き込まれる重み (654,032 B、Release v0.3.0)。<strong>MIT / BSL-1.0 は適用されない。</strong>
+帰属表示と生成音声の用途制限が再配布先にも伝播する。</p>
+<ul>
+  <li>ライセンス全文: <a href="https://github.com/ciniml/stackchan-idf/blob/main/assets/sanotts/LICENSE-MODEL.md" target="_blank" rel="noopener">assets/sanotts/LICENSE-MODEL.md</a></li>
+  <li>帰属表示 (そのまま再掲) と用途制限: <a href="https://github.com/ciniml/stackchan-idf/blob/main/assets/sanotts/NOTICE.md" target="_blank" rel="noopener">assets/sanotts/NOTICE.md</a></li>
+</ul>
+<pre style="white-space:pre-wrap;font-size:0.8rem">This model was distilled from a piper-plus teacher model.
+sanoTTS-jp — https://github.com/ayutaz/sanoTTS-jp
+
+つくよみちゃんコーパス
+  本ソフトウェアの音声合成には、フリー素材キャラクター「つくよみちゃん」
+  （© 夢前黎）が無料公開している音声データを使用しています。
+  https://tyc.rei-yumesaki.net/material/corpus/
+
+MOE-Speech (litagin) — https://huggingface.co/spaces/litagin/moe-speech-license
+  著作権法 30 条の 4（情報解析のための利用）に基づき学習に使用。
+
+蒸留に使用したテキストコーパス:
+  - Common Voice ja (Mozilla) — CC0-1.0
+      https://github.com/common-voice/common-voice
+  - ROHAN4600 (森勢将雅) — CC0-1.0
+      https://github.com/mmorise/rohan4600
+  - ITA コーパス — CC0-1.0
+      https://github.com/mmorise/ita-corpus
+  - JSUT ver1.1 (高道慎之介) — CC-BY-SA-4.0 ほか（subset 別）
+      https://sites.google.com/site/shinnosuketakamichi/publication/jsut
+
+教師実装: piper-plus (MIT) — https://github.com/ayutaz/piper-plus</pre>
+<p>生成音声の用途制限 (ライセンス §3.2): 個人・団体への攻撃・批判 / 政治・宗教上の主張 / アダルト用途 /
+音声素材としての再配布に使えない。一次ソース: <a href="https://tyc.rei-yumesaki.net/material/corpus/" target="_blank" rel="noopener">つくよみちゃんコーパス</a>。</p>
 </div>
 
 <div class="card">

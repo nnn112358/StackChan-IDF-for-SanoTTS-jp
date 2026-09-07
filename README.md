@@ -51,6 +51,14 @@ Pages サイトに反映されます。
 - **スピーカー / オーディオ**: 起動音 (C5–E5–G5、設定で OFF 可)、jtts ランダム
   babble、AAC 録音再生、BLE オーディオ ストリーム、Wi-Fi RTP (L16 / μ-law / AAC) 受信。
   音量は **0..200%** をライブ制御 (BLE / Wi-Fi / 本体 UI)。
+- **sanoTTS-jp ニューラル TTS** (CoreS3): [sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp)
+  (559K params の蒸留モデル、22.05 kHz) を jtts の `sano` エンジンとして内蔵。babble /
+  LT アナウンス / `/api/jtts-say` / `/mcp/say` の発話が sanoTTS になり、包絡から
+  **アバターの口がリップシンク**する (他エンジンと同じ Speech 経路)。重み 654 KB は
+  `sano` パーティション (partitions_16mb.csv) に `make flash` が書き込む。読みは
+  かなに加えて sanoTTS 中間表現 (`[` 上昇 / `]` 下降核 / `#` 句境界 / `°` 無声化 / `?`)
+  をそのまま書ける。詳細は [components/saanotts_core/README.md](components/saanotts_core/README.md)、
+  モデルの帰属表示と用途制限は [assets/sanotts/NOTICE.md](assets/sanotts/NOTICE.md)。
 - **NeoPixel**: nekomimi 用 LED ストリップ アニメーション (虹 / 単色 / リップシンク
   レベルメーター モード)。
 - **LT タイマー**: 発表時間アシスト。残り N 秒で予告 → 時刻ぴったり → 超過繰返し
@@ -143,7 +151,8 @@ OpenAI / Gemini の API キーはビルドに埋め込まず、BLE / Wi-Fi 設�
 │   ├── avatar_vm/          Avatar DSL バイトコード VM + ストレージ
 │   ├── board/              CoreS3 / AtomS3R / StopWatch HW 初期化 (ボード自動検出)
 │   ├── scs_servo/          SCS0009 ドライバ + PathGenerator (台形速度)
-│   ├── jtts/               日本語カタコト TTS (babble / speak_katakoto / LT 通知)
+│   ├── jtts/               日本語 TTS (formant / unit / HMM / sanoTTS の 4 エンジン)
+│   ├── saanotts_core/      sanoTTS-jp 推論コア + かな G2P (vendored, MIT)
 │   ├── conversation/       AI 音声対話クライアント (OpenAI / Gemini / XiaoZhi)
 │   ├── config_service/     BLE GATT 設定サービス + NVS + OTA + X25519/AES-GCM
 │   ├── wifi_config_service/ Wi-Fi HTTP 設定 + 内蔵 Web ページ + release OTA
@@ -156,7 +165,8 @@ OpenAI / Gemini の API キーはビルドに埋め込まず、BLE / Wi-Fi 設�
 ├── patches/                upstream-targeted patches
 ├── tools/                  apply-m5-patches.sh, monitor_log.py, settings.html,
 │                           avatar_dsl/ (コンパイラ + WASM 連携)
-├── assets/                 .avdsl ソース (default_face, omega_mouth, aokko_face)
+├── assets/                 .avdsl ソース (default_face, omega_mouth, aokko_face)、
+│                           voices/ (HMM ボイス)、sanotts/ (sanoTTS 重み + NOTICE)
 ├── partitions.csv          OTA 配置 (ota_0 / ota_1 / nvs / storage)
 ├── sdkconfig.defaults*     共通 + ボード別 (.cores3 / .atoms3r / .atoms3 / .stopwatch)
 └── Makefile                idf.py の薄いラッパ (BOARD= 切替)
@@ -177,9 +187,11 @@ Submodule (`components/M5GFX` / `components/M5Unified` / `components/tl_expected
 
 ### 第三者ソフトウェア・音声データの帰属表示
 
-HMM 音声合成に使う **hts_engine API** (Modified BSD / 名古屋工業大学・東京工業大学)
-と、同梱・配布する **HMM ボイス "Mei"** (CC BY 3.0 / 名古屋工業大学・MMDAgent
-Project Team) をはじめとする第三者コンポーネントの帰属表示は
+HMM 音声合成に使う **hts_engine API** (Modified BSD / 名古屋工業大学・東京工業大学)、
+同梱・配布する **HMM ボイス "Mei"** (CC BY 3.0 / 名古屋工業大学・MMDAgent
+Project Team)、**sanoTTS-jp** 推論コア (MIT) と重み (sanoTTS-jp Model License 1.0 —
+つくよみちゃんコーパス由来の帰属表示と生成音声の用途制限が伝播) をはじめとする
+第三者コンポーネントの帰属表示は
 **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** にまとめています。
 HTML 版 (Web フラッシャー・設定ページからも参照可):
 <https://ciniml.github.io/stackchan-idf/licenses.html>。

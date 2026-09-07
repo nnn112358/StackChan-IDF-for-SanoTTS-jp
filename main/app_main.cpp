@@ -58,6 +58,7 @@
 #include "speech.hpp"
 #include "voice_db.hpp"
 #include "hmm_voice.hpp"
+#include "sano_model.hpp"
 #if CONFIG_STACKCHAN_WIFI_AUDIO_ENABLED
 #include "wifi_audio.hpp"
 #endif
@@ -1080,6 +1081,11 @@ extern "C" void app_main()
         }
         if (stackchan::app::hmm_voice::init()) {
             ESP_LOGI(kTag, "hts: HMM voice active — HMM TTS enabled");
+        }
+        // sanoTTS: 重みは flash mmap (RAM 0)、作業領域 176 KB は発話中だけ PSRAM。
+        // ASR モードでも内部 RAM を食わないので載せる。
+        if (stackchan::app::sano_model::init()) {
+            ESP_LOGI(kTag, "sano: sanoTTS model active — neural TTS enabled (Auto picks it first)");
         }
     }
 

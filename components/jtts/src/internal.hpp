@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -115,5 +116,18 @@ bool build_hts_labels(std::u32string_view text, std::vector<std::string>& labels
 // HMM エンジン本体 (hmm_synth.cpp)。ボイス未ロード・ラベル生成失敗・
 // レート非対応時は out を触らず false (呼び出し側がフォールバック)。
 bool render_hmm(std::u32string_view text, std::vector<std::int16_t>& out, const Options& opt);
+
+// ---- sanoTTS-jp エンジン (sano_synth.cpp) ----
+
+// かな (jtts 共通表記 + sanoTTS 中間表現の記号) を sanoTTS のかな中間表現
+// (UTF-8) に直す (sano_text.cpp、常にコンパイル)。読めない文字は読み飛ばして
+// `skipped` に数える (他エンジンの parse_kana と同じ扱い)。空になったら false。
+bool build_sano_intermediate(std::u32string_view text, std::string& out,
+                             std::size_t* skipped = nullptr);
+
+// sanoTTS エンジン本体。モデル未ロード・G2P 失敗・350 ids 超・メモリ不足は
+// out を触らず false (呼び出し側がフォールバック)。22.05 kHz で合成して
+// opt.sample_rate_hz へ窓付き sinc でリサンプルし、ピークを opt.gain に正規化する。
+bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const Options& opt);
 
 }  // namespace stackchan::jtts::internal

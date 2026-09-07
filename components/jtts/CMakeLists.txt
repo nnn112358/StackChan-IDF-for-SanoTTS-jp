@@ -12,9 +12,12 @@ idf_component_register(
         "src/unit_synth.cpp"
         "src/hts_label.cpp"
         "src/hmm_synth.cpp"
+        "src/sano_text.cpp"
+        "src/resampler.cpp"
+        "src/sano_synth.cpp"
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "src"
     REQUIRES tl_expected
-    PRIV_REQUIRES hts_engine
+    PRIV_REQUIRES hts_engine saanotts_core
 )
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_20)

@@ -83,10 +83,18 @@ tl::expected<void, Error> synthesize(std::u32string_view kana,
     out.clear();
     Options opt = resolve_defaults(opt_in);
 
-    // HMM エンジン: ボイスがロード済みなら最優先 (品質最良)。
-    // アクセント記号 (' と /) は HMM のみ解釈し、他エンジンでは
+    // sanoTTS エンジン: モデルがロード済みなら最優先 (ニューラル、品質最良)。
+    // 読めない / 長すぎる / モデル無しは false を返すので下へ落ちる。
+    if (opt.engine == Engine::Auto || opt.engine == Engine::Sano) {
+        if (internal::render_sano(kana, out, opt)) {
+            return {};
+        }
+    }
+
+    // HMM エンジン: ボイスがロード済みなら次点。
+    // アクセント記号 (' と /) は HMM / sanoTTS が解釈し、他エンジンでは
     // parse_kana が読み飛ばす。
-    if (opt.engine == Engine::Auto || opt.engine == Engine::Hmm) {
+    if (opt.engine != Engine::Formant && opt.engine != Engine::Unit) {
         if (internal::render_hmm(kana, out, opt)) {
             return {};
         }

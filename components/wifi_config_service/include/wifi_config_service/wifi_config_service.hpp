@@ -159,6 +159,17 @@ using HmmVoiceStatusGetter = std::function<HmmVoiceStatus()>;
 void set_hmm_voice_sink(HmmVoiceSink sink);
 void set_hmm_voice_status_getter(HmmVoiceStatusGetter getter);
 
+// sanoTTS-jp の重み blob (16 MB flash ボードの sano パーティション、`make flash` /
+// 一括イメージで書き込み。HTTP からの書き換えは無い):
+//   GET /api/sano-model — status getter の内容を JSON で返す
+//                          {"loaded":bool,"capacity":u32 (0 = パーティションなし)}。
+struct SanoModelStatus {
+    bool loaded = false;
+    std::uint32_t capacity = 0;
+};
+using SanoModelStatusGetter = std::function<SanoModelStatus()>;
+void set_sano_model_status_getter(SanoModelStatusGetter getter);
+
 // One-shot camera capture for `GET /api/camera/capture`. The sink fills
 // `out` with a raw row-major frame, reports its dimensions, and names the
 // pixel encoding in `format` — served verbatim as the X-Frame-Format

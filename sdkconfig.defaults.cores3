@@ -105,3 +105,8 @@ CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=65536
 # 時のみ余裕が減るが、動作は維持。
 CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=3
 CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=4
+
+# sanoTTS-jp (ニューラル TTS) 合成エンジン。重み blob は partitions_16mb.csv の sano
+# パーティション (1 MB) に `make flash` が書く。作業領域 176 KB は PSRAM
+# (CONFIG_JTTS_SANO_ARENA_INTERNAL は OFF のまま — 内部 RAM は WiFi/BLE/esp-sr で逼迫)。
+CONFIG_JTTS_ENABLE_SANO=y

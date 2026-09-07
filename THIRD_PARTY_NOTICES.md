@@ -27,6 +27,33 @@ HMM 音声合成エンジン。`components/hts_engine/` に組み込み向け改
 > ... THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 > "AS IS" ...
 
+### sanoTTS-jp 推論コア — MIT
+
+蒸留ニューラル TTS [sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp) の C99 推論コアと
+かな G2P。`components/saanotts_core/` に vendored (origin/main d169e91、無改変。
+[components/saanotts_core/README.md](components/saanotts_core/README.md))。
+
+- Copyright (c) 2026 yousan — MIT License
+- ライセンス全文: [components/saanotts_core/LICENSE](components/saanotts_core/LICENSE)
+
+---
+
+## 音声モデル (sanoTTS-jp 重み)
+
+### sanoTTS-jp モデル v3 (int8) — sanoTTS-jp Model License 1.0
+
+`assets/sanotts/saanotts-jp-v3-int8.bin` (sanoTTS-jp Release v0.3.0、654,032 B、SHA-256
+`2d2b8543…`)。CoreS3 の一括イメージ (`firmware-<ver>-cores3.bin`) と `make flash` が
+`sano` パーティションに書き込む。**リポジトリの BSL-1.0 / コアの MIT は重みには適用されない。**
+
+- ライセンス: `LicenseRef-sanoTTS-jp-Model-1.0`
+  (全文: [assets/sanotts/LICENSE-MODEL.md](assets/sanotts/LICENSE-MODEL.md))
+- 帰属表示 (ライセンス §3.1 により**そのまま**再掲) と生成音声の**用途制限** (§3.2:
+  個人・団体への攻撃・批判 / 政治・宗教上の主張 / アダルト用途 / 音声素材としての
+  再配布に使えない。つくよみちゃんコーパスの条件が伝播したもの) は
+  [assets/sanotts/NOTICE.md](assets/sanotts/NOTICE.md)。重みを含むイメージを再配布する
+  ときは同 NOTICE ごと配布すること (§3.3)。
+
 ---
 
 ## 音声モデル (HMM ボイス)

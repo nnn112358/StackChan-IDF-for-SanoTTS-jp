@@ -5,6 +5,7 @@
 
 #include "voice_db.hpp"
 #include "hmm_voice.hpp"
+#include "sano_model.hpp"
 
 #include <cstdio>
 #include <memory>
@@ -445,6 +446,13 @@ void register_avatar_bytecode_sinks()
         []() -> stackchan::wifi_config::HmmVoiceStatus {
             const auto st = hmm_voice::status();
             return {st.loaded, st.stored_bytes, st.capacity};
+        });
+
+    // sanoTTS モデル (GET /api/sano-model — 状態のみ。書き込みは make flash / 一括イメージ)。
+    stackchan::wifi_config::set_sano_model_status_getter(
+        []() -> stackchan::wifi_config::SanoModelStatus {
+            const auto st = sano_model::status();
+            return {st.loaded, st.capacity};
         });
 }
 

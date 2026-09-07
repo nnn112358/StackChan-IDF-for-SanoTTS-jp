@@ -578,7 +578,8 @@
 
       <label for="jtts-engine">エンジン</label>
       <select id="jtts-engine">
-        <option value="auto">自動 (HMM ボイス &gt; 音声 DB &gt; フォルマント)</option>
+        <option value="auto">自動 (sanoTTS &gt; HMM ボイス &gt; 音声 DB &gt; フォルマント)</option>
+        <option value="sano">sanoTTS (ニューラル、モデル必須、無ければフォールバック)</option>
         <option value="hmm">HMM 合成 (ボイス必須、無ければフォールバック)</option>
         <option value="unit">単位連結 (DB 必須、無ければフォルマント)</option>
         <option value="formant">フォルマント合成のみ</option>
@@ -586,6 +587,17 @@
 
       <label for="jtts-halftone">HMM ピッチシフト [半音]</label>
       <input type="number" id="jtts-halftone" min="-12" max="12" step="0.5" placeholder="0">
+
+      <h2 class="section-title" style="margin-top:1rem">sanoTTS (ニューラル TTS)</h2>
+      <p class="hint" style="margin-bottom:0.5rem">
+        <a href="https://github.com/ayutaz/sanoTTS-jp" target="_blank" rel="noopener">sanoTTS-jp</a>
+        (559K params の蒸留モデル、CoreS3 のみ)。重み (654 KB) は firmware の一括イメージ /
+        <code>make flash</code> で <code>sano</code> パーティションに書き込まれます (OTA では更新されない)。
+        読みはかなに加えて sanoTTS の中間表現 (<code>[</code> 上昇 / <code>]</code> 下降核 /
+        <code>#</code> 句境界 / <code>°</code> 無声化 / <code>?</code> 疑問) をそのまま書けます。
+        例: <code>きょ][おわよ][いて][んきです°ね</code>。生成音声の用途制限あり (帰属表示ページ参照)。
+      </p>
+      <p class="hint" id="sano-model-status" style="margin-bottom:0.5rem">状態: —</p>
 
       <h2 class="section-title" style="margin-top:1rem">HMM ボイス (.htsvoice)</h2>
       <p class="hint" style="margin-bottom:0.5rem">
@@ -1124,7 +1136,7 @@ function applyJttsToForm(json) {
   try { obj = JSON.parse(json); } catch { return; }
   if (obj.voice) $('jtts-voice').value = obj.voice;
   if (obj.synth === 'classic' || obj.synth === 'v2') $('jtts-synth').value = obj.synth;
-  if (['auto', 'formant', 'unit', 'hmm'].includes(obj.engine)) {
+  if (['auto', 'formant', 'unit', 'hmm', 'sano'].includes(obj.engine)) {
     $('jtts-engine').value = obj.engine;
   }
   for (const [key, id] of Object.entries(JTTS_NUM_FIELDS)) {
@@ -1234,6 +1246,19 @@ let hmmCatalog = [];
 function hmmLabelForSize(bytes) {
   const hit = hmmCatalog.find((v) => v.size === bytes);
   return hit ? hit.label : null;
+}
+
+async function refreshSanoModelStatus() {
+  try {
+    const st = await fetchJSON('/api/sano-model');
+    if (st.capacity === 0) {
+      $('sano-model-status').textContent = '状態: sano パーティションなし (CoreS3 以外 / 旧パーティション表 — USB で書き直し)';
+    } else if (st.loaded) {
+      $('sano-model-status').textContent = '状態: モデル ロード済み (自動エンジンで最優先)';
+    } else {
+      $('sano-model-status').textContent = '状態: モデル未書き込み (make flash / 一括イメージで書き込み)';
+    }
+  } catch (e) { $('sano-model-status').textContent = '状態: 取得失敗'; }
 }
 
 async function refreshHmmVoiceStatus() {
@@ -1389,6 +1414,7 @@ $('btn-hmm-voice-clear').addEventListener('click', async () => {
   refreshHmmVoiceStatus();
 });
 refreshHmmVoiceStatus();
+refreshSanoModelStatus();
 loadHmmCatalog();
 
 // --- Status refresh ---

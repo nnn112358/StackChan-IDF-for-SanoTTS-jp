@@ -386,6 +386,11 @@ void set_hmm_voice_status_getter(HmmVoiceStatusGetter getter)
     http::set_hmm_voice_status_getter(std::move(getter));
 }
 
+void set_sano_model_status_getter(SanoModelStatusGetter getter)
+{
+    http::set_sano_model_status_getter(std::move(getter));
+}
+
 void set_camera_capture_sink(CameraCaptureSink sink)
 {
     http::set_camera_capture_sink(std::move(sink));

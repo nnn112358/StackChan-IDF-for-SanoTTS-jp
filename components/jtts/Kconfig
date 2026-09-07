@@ -9,4 +9,24 @@ config JTTS_ENABLE_HMM
         (CoreS3 / stopwatch) 向け。無効時は render_hmm がスタブになり
         hts_engine のコードはリンクされない。
 
+config JTTS_ENABLE_SANO
+    bool "Enable sanoTTS-jp (neural, 559K params) synthesis engine"
+    default n
+    help
+        sanoTTS-jp (蒸留ニューラル TTS、22.05 kHz) を jtts::Engine::Sano として
+        有効にする。重み blob (654 KB、sanoTTS-jp Model License 1.0) は
+        `sano` パーティション (partitions_16mb.csv) に焼いて mmap する。
+        合成の作業領域 176 KB は既定で PSRAM (JTTS_SANO_ARENA_INTERNAL 参照)。
+        無効時は render_sano がスタブになり推論コアはリンクされない。
+
+config JTTS_SANO_ARENA_INTERNAL
+    bool "sanoTTS: try internal DRAM for the 176 KB synthesis arena"
+    default n
+    depends on JTTS_ENABLE_SANO
+    help
+        合成の作業領域 (176 KB) をまず内部 DRAM から取る (取れなければ PSRAM)。
+        内部 DRAM だと上流実測で xRT 0.45 (PSRAM は未計測、数倍遅い見込み)。
+        このファームは WiFi / BLE / esp-sr と内部 RAM を奪い合うので既定は OFF
+        (常に PSRAM)。発話は全部合成してから鳴らすので、遅い分は待ち時間になるだけ。
+
 endmenu

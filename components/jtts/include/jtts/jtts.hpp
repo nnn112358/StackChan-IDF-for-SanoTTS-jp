@@ -29,18 +29,26 @@ enum class SynthVariant : std::uint8_t {
 
 // 合成エンジンの選択 (SynthVariant はフォルマント エンジン内の音色バリアント、
 // こちらはエンジンそのものの軸)。
-//   Auto    — HMM ボイス (set_hmm_voice) があれば Hmm、次に音声 DB
-//             (set_voice_db) があれば Unit、どちらも無ければ Formant
+//   Auto    — sanoTTS モデル (set_sano_model) があれば Sano、次に HMM ボイス
+//             (set_hmm_voice) があれば Hmm、次に音声 DB (set_voice_db) があれば
+//             Unit、どれも無ければ Formant
 //   Formant — 常にフォルマント合成
 //   Unit    — 単位連結 (TD-PSOLA)。DB 未ロード / 必要単位の欠けは
 //             Formant へ自動フォールバック
 //   Hmm     — HMM 合成 (hts_engine)。ボイス未ロード時は Unit → Formant へ
 //             フォールバック
+//   Sano    — sanoTTS-jp (蒸留ニューラル TTS)。モデル未ロード / 読みが変換
+//             できない / 長すぎる (350 ids 超) ときは Hmm → Unit → Formant へ
+//             フォールバック。読みは jtts 共通のかな + アクセント記号
+//             (`'` 核 / `/` 句切り / 、。 で間) に加え、sanoTTS の中間表現
+//             (`[` 上昇 / `]` 下降核 / `#` 句境界 / `°` 無声化 / `?` 疑問) を
+//             そのまま書ける
 enum class Engine : std::uint8_t {
     Auto = 0,
     Formant = 1,
     Unit = 2,
     Hmm = 3,
+    Sano = 4,
 };
 
 struct Options {
@@ -76,7 +84,7 @@ struct Options {
     float bw_scale = 1.0f;
     // 合成方式。既定 V2。
     SynthVariant synth = SynthVariant::V2;
-    // エンジン選択。既定 Auto (HMM ボイス > 音声 DB > フォルマントの順)。
+    // エンジン選択。既定 Auto (sanoTTS > HMM ボイス > 音声 DB > フォルマントの順)。
     Engine engine = Engine::Auto;
 
     // ----- HMM エンジンのみ -----
@@ -113,5 +121,15 @@ bool set_hmm_voice(std::span<const std::uint8_t> htsvoice);
 
 // HMM ボイスがロード済みか。
 bool hmm_voice_loaded();
+
+// sanoTTS-jp エンジン用の重み blob (SAAN 形式 v2、int8) を登録する。blob の寿命は
+// 呼び出し側が保証する (flash mmap / PSRAM)。コアは blob を読むだけでコピーしない
+// (16 バイト境界が要る — flash mmap / heap_caps_aligned_alloc なら満たす)。空 span で
+// 解除。ヘッダ検証に失敗すると false (未ロード状態のまま)。スレッド安全ではない。
+// CONFIG_JTTS_ENABLE_SANO 無効ビルドでは常に false。
+bool set_sano_model(std::span<const std::uint8_t> blob);
+
+// sanoTTS モデルがロード済みか。
+bool sano_model_loaded();
 
 }  // namespace stackchan::jtts

@@ -143,6 +143,7 @@ VoiceDbSink g_voice_db_sink = nullptr;
 VoiceDbStatusGetter g_voice_db_status_getter = nullptr;
 HmmVoiceSink g_hmm_voice_sink = nullptr;
 HmmVoiceStatusGetter g_hmm_voice_status_getter = nullptr;
+SanoModelStatusGetter g_sano_model_status_getter = nullptr;
 CameraCaptureSink g_camera_capture_sink = nullptr;
 CameraRegSink g_camera_reg_sink = nullptr;
 McpSayKanaSink g_mcp_say_sink = nullptr;
@@ -1403,6 +1404,20 @@ esp_err_t handle_hmm_voice_get(httpd_req_t* req)
     return send_json(req, body);
 }
 
+// GET /api/sano-model — sanoTTS モデルの状態 (書き込みは USB flash 経由のみなので GET だけ)。
+esp_err_t handle_sano_model_get(httpd_req_t* req)
+{
+    if (!require_auth(req)) return ESP_OK;
+    xSemaphoreTake(g_mutex, portMAX_DELAY);
+    SanoModelStatusGetter getter = g_sano_model_status_getter;
+    xSemaphoreGive(g_mutex);
+    const SanoModelStatus st = getter ? getter() : SanoModelStatus{};
+    char body[96];
+    std::snprintf(body, sizeof(body), R"({"loaded":%s,"capacity":%u})",
+                  st.loaded ? "true" : "false", static_cast<unsigned>(st.capacity));
+    return send_json(req, body);
+}
+
 // GET /api/voices — Pages の voices.json マニフェストを HTTPS プロキシして返す
 // (AP モードの iOS からもデバイス経由で取得できる)。STA が落ちていれば 502。
 esp_err_t handle_voices_get(httpd_req_t* req)
@@ -1948,6 +1963,7 @@ void register_handlers(httpd_handle_t server, const config::DeviceConfig& curren
     add(server, "/api/hmm-voice/clear",  HTTP_POST, handle_hmm_voice_clear_post);
     add(server, "/api/hmm-voice/fetch",  HTTP_POST, handle_hmm_voice_fetch_post);
     add(server, "/api/voices",           HTTP_GET,  handle_voices_get);
+    add(server, "/api/sano-model",       HTTP_GET,  handle_sano_model_get);
     add(server, "/api/metrics/audio",    HTTP_GET,  handle_audio_metrics_get);
     add(server, "/api/led-state",        HTTP_GET,  handle_led_state_get);
     add(server, "/api/led-state",        HTTP_POST, handle_led_state_post);
@@ -2175,6 +2191,17 @@ void set_hmm_voice_status_getter(HmmVoiceStatusGetter getter)
     }
     xSemaphoreTake(g_mutex, portMAX_DELAY);
     g_hmm_voice_status_getter = std::move(getter);
+    xSemaphoreGive(g_mutex);
+}
+
+void set_sano_model_status_getter(SanoModelStatusGetter getter)
+{
+    if (g_mutex == nullptr) {
+        g_sano_model_status_getter = std::move(getter);
+        return;
+    }
+    xSemaphoreTake(g_mutex, portMAX_DELAY);
+    g_sano_model_status_getter = std::move(getter);
     xSemaphoreGive(g_mutex);
 }
 

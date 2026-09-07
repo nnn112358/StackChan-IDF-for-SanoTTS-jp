@@ -80,7 +80,7 @@ void apply_synth(jtts::Options& opt, const cJSON* item)
     }
 }
 
-// engine は文字列 ("auto"/"formant"/"unit"/"hmm")。missing / 不明値は現在値を維持。
+// engine は文字列 ("auto"/"formant"/"unit"/"hmm"/"sano")。missing / 不明値は現在値を維持。
 void apply_engine(jtts::Options& opt, const cJSON* item)
 {
     if (!cJSON_IsString(item) || item->valuestring == nullptr) return;
@@ -92,6 +92,8 @@ void apply_engine(jtts::Options& opt, const cJSON* item)
         opt.engine = jtts::Engine::Unit;
     } else if (std::strcmp(item->valuestring, "hmm") == 0) {
         opt.engine = jtts::Engine::Hmm;
+    } else if (std::strcmp(item->valuestring, "sano") == 0) {
+        opt.engine = jtts::Engine::Sano;
     }
 }
 

@@ -19,6 +19,20 @@ add_library(hts_engine STATIC ${HTS_SRCS})
 target_include_directories(hts_engine PUBLIC ${HTS_ROOT}/include PRIVATE ${HTS_ROOT}/lib)
 target_compile_definitions(hts_engine PRIVATE AUDIO_PLAY_NONE HTS_EMBEDDED)
 
+# sanoTTS-jp 推論コア (vendored C99)。ホストは PIE 無し (W8A8 スカラ経路)。
+set(SANO_ROOT ${JTTS_ROOT}/../saanotts_core)
+add_library(saanotts_core STATIC
+    ${SANO_ROOT}/saanotts.c
+    ${SANO_ROOT}/saanotts_stream.c
+    ${SANO_ROOT}/fft.c
+    ${SANO_ROOT}/saanotts_int8.c
+    ${SANO_ROOT}/g2p.c
+)
+target_include_directories(saanotts_core PUBLIC ${SANO_ROOT})
+target_compile_definitions(saanotts_core PRIVATE SAAN_INT8_ACT=1)
+target_compile_options(saanotts_core PRIVATE -Wall -Wextra -O2)
+target_link_libraries(saanotts_core PUBLIC m)
+
 add_library(jtts STATIC
     ${JTTS_ROOT}/src/kana_table.cpp
     ${JTTS_ROOT}/src/phoneme.cpp
@@ -32,12 +46,15 @@ add_library(jtts STATIC
     ${JTTS_ROOT}/src/unit_synth.cpp
     ${JTTS_ROOT}/src/hts_label.cpp
     ${JTTS_ROOT}/src/hmm_synth.cpp
+    ${JTTS_ROOT}/src/sano_text.cpp
+    ${JTTS_ROOT}/src/resampler.cpp
+    ${JTTS_ROOT}/src/sano_synth.cpp
 )
 target_include_directories(jtts
     PUBLIC ${JTTS_ROOT}/include ${EXPECTED_INC}
     PRIVATE ${JTTS_ROOT}/src
 )
-target_link_libraries(jtts PRIVATE hts_engine)
+target_link_libraries(jtts PRIVATE hts_engine saanotts_core)
 target_compile_options(jtts PRIVATE -Wall -Wextra)
 
 add_executable(jtts_synth_demo main.cpp wav_writer.cpp)
@@ -77,3 +94,15 @@ add_executable(jtts_hmm_demo hmm_demo.cpp wav_writer.cpp)
 target_link_libraries(jtts_hmm_demo PRIVATE jtts)
 target_include_directories(jtts_hmm_demo PRIVATE ${JTTS_ROOT}/src)
 target_compile_options(jtts_hmm_demo PRIVATE -Wall -Wextra)
+
+# sanoTTS エンジン: かな中間表現ダンプ + かな→WAV デモ
+add_executable(jtts_sano_demo sano_demo.cpp wav_writer.cpp)
+target_link_libraries(jtts_sano_demo PRIVATE jtts)
+target_include_directories(jtts_sano_demo PRIVATE ${JTTS_ROOT}/src)
+target_compile_options(jtts_sano_demo PRIVATE -Wall -Wextra)
+
+# sanoTTS エンジン: 読み変換 / リサンプラ / 合成の単体テスト (CI が回す)
+add_executable(jtts_test_sano test_sano.cpp)
+target_link_libraries(jtts_test_sano PRIVATE jtts)
+target_include_directories(jtts_test_sano PRIVATE ${JTTS_ROOT}/src)
+target_compile_options(jtts_test_sano PRIVATE -Wall -Wextra)
