@@ -9,6 +9,11 @@ M5Stack CoreS3 の上で日本語を喋る Stack-chan ファームウェア。�
 [sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp) (559 K params の蒸留モデル、22.05 kHz)
 を音声合成エンジンとして統合したものです。ESP-IDF 5.5 / C++20。
 
+![CoreS3 上で sanoTTS が喋り、口が動く様子](docs/media/demo.gif)
+
+> 実機の動作 ([@nnn112358 の投稿](https://x.com/nnn112358/status/2097082230556467251))。
+> `POST /api/jtts-say` に送った文を端末だけで合成し、吹き出しに出しながら喋っています。
+
 ```
 読み (かな or 漢字かな交じり)
    → G2P (かな中間表現 / Open JTalk + 辞書)

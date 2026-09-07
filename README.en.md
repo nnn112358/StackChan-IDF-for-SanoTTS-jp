@@ -10,6 +10,12 @@ This is a fork of [stackchan-idf](https://github.com/ciniml/stackchan-idf) that 
 [sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp) (a 559 K parameter distilled model,
 22.05 kHz) as a synthesis engine. ESP-IDF 5.5 / C++20.
 
+![sanoTTS speaking on a CoreS3 with the mouth in sync](docs/media/demo.gif)
+
+> The firmware running on hardware ([post by @nnn112358](https://x.com/nnn112358/status/2097082230556467251)).
+> A sentence sent to `POST /api/jtts-say` is synthesised on the device and spoken while the
+> balloon shows the text.
+
 ```
 reading (kana, or kanji text on the dictionary build)
    → G2P (kana intermediate form / Open JTalk + dictionary)
