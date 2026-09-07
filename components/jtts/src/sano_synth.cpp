@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
+// SPDX-FileCopyrightText: 2026 nnn112358 <neko112358@gmail.com>
 // SPDX-License-Identifier: BSL-1.0
 //
 // sanoTTS-jp (蒸留ニューラル TTS、559 K params) エンジン。components/saanotts_core の

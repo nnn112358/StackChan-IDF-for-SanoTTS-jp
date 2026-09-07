@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 nnn112358 <neko112358@gmail.com>
+# SPDX-License-Identifier: BSL-1.0
 # 端末内漢字 G2P 用の辞書 blob (13.7 MB、git には入れていない) を sanoTTS-jp の Release から取る。
 #   tools/get-sano-dict.sh   → assets/sanotts/k1-dict-438750.bin
 # `make flash BOARD=cores3-dict` がこれを dict パーティションに書き込む。

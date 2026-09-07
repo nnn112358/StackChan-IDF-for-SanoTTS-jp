@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
+// SPDX-FileCopyrightText: 2026 nnn112358 <neko112358@gmail.com>
 // SPDX-License-Identifier: BSL-1.0
 //
 // jtts の読み (かな + アクセント記号) → sanoTTS のかな中間表現 (UTF-8)。

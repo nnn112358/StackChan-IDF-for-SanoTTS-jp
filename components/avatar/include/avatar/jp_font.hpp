@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Kenta IDA <fuga@fugafuga.org>
+// SPDX-FileCopyrightText: 2026 nnn112358 <neko112358@gmail.com>
 // SPDX-License-Identifier: BSL-1.0
 //
 // 日本語フォントの選択。通常は 12/16/20/24 px の 4 サイズ (合計 ~760 KB)。

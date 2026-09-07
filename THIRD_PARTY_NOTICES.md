@@ -1,7 +1,10 @@
 # 第三者ソフトウェア・データの帰属表示 (Third-Party Notices)
 
-stackchan-idf の**自前ソース**は Boost Software License 1.0 ([LICENSE](LICENSE))
-で配布されます。本ファイルは、firmware / Web フラッシャー配布物 (リリース ZIP・
+このリポジトリ (StackChan-IDF-for-SanoTTS-jp) の**自前ソース**は Boost Software License 1.0
+([LICENSE](LICENSE)) で配布されます。上流 stackchan-idf 由来のファイルは
+© Kenta IDA、このフォークで新規に書いたファイル (`components/jtts/src/sano_*.cpp` /
+`resampler.*`、`main/sano_model.*` / `sano_stream_player.*`、`assets/purin_face.avdsl` など) は
+© nnn112358 で、いずれも同じ BSL-1.0 です。本ファイルは、firmware / Web フラッシャー配布物 (リリース ZIP・
 GitHub Pages) に含まれる、または同梱する**第三者のソフトウェアと音声データ**の
 帰属表示と適用ライセンスをまとめたものです。
 
