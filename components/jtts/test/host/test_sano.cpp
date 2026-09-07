@@ -123,7 +123,14 @@ void test_synthesis(const char* path) {
     int peak = 0;
     for (auto v : pcm) peak = std::max(peak, std::abs(static_cast<int>(v)));
     std::printf("       peak %d\n", peak);
-    check(peak > 0.28 * 32760 && peak <= 0.3 * 32760 + 8, "peak normalised to 0.3 at default gain 0.6");
+    check(peak > 0.2 * 32760 && peak <= 0.3 * 32760 + 8, "soft limiter keeps peak within 0.3 at default gain");
+    {
+        double sq = 0.0;
+        for (auto v : pcm) sq += static_cast<double>(v) * v;
+        const double rms = std::sqrt(sq / pcm.size()) / 32760.0;
+        std::printf("       rms %.3f\n", rms);
+        check(rms > 0.08 && rms < 0.14, "loudness normalised toward RMS 0.12");
+    }
 
     // Auto はモデルがあれば Sano を選ぶ (レート 22050 で判別)
     Options auto_opt;
