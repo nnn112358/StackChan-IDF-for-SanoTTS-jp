@@ -477,12 +477,40 @@ extern "C" void app_main()
     stackchan::app::settings_sinks::apply_speaker_volume(cfg.speaker_volume_pct);
     if (cfg.startup_arpeggio_enabled) {
         // ドレミファソ (C5 D5 E5 F5 G5)。元の C5–E5–G5 アルペジオから変更。
-        for (float freq : {523.25f, 587.33f, 659.25f, 698.46f, 783.99f}) {
-            M5.Speaker.tone(freq, 150);
-            vTaskDelay(pdMS_TO_TICKS(180));
-        }
-        while (M5.Speaker.isPlaying()) {
-            vTaskDelay(pdMS_TO_TICKS(20));
+        // M5.Speaker.tone() はフルスケールの正弦波を瞬時に on/off するので、CoreS3 の
+        // 小さなスピーカー + ブースト無効の AW88298 では音が割れ、クリックも乗る。
+        // 振幅 35% の正弦波に 5 ms のフェードを付けて playRaw で鳴らす (16 kHz、
+        // バッファは PSRAM に取り、鳴り終わったら返す)。
+        constexpr std::uint32_t kRate = 16'000;
+        constexpr std::size_t kNoteSamples = kRate * 150 / 1000;  // 150 ms
+        constexpr std::size_t kGapSamples = kRate * 30 / 1000;    // 30 ms
+        constexpr std::size_t kFadeSamples = kRate * 5 / 1000;    // 5 ms
+        constexpr float kAmplitude = 0.35f * 32767.0f;
+        constexpr float kNotes[] = {523.25f, 587.33f, 659.25f, 698.46f, 783.99f};
+        constexpr std::size_t kNoteCount = sizeof(kNotes) / sizeof(kNotes[0]);
+        constexpr std::size_t kTotal = kNoteCount * (kNoteSamples + kGapSamples);
+        auto* pcm = static_cast<std::int16_t*>(
+            heap_caps_calloc(kTotal, sizeof(std::int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        if (pcm != nullptr) {
+            constexpr float kTwoPi = 6.28318530718f;
+            std::size_t pos = 0;
+            for (float freq : kNotes) {
+                for (std::size_t i = 0; i < kNoteSamples; ++i) {
+                    float env = 1.0f;
+                    if (i < kFadeSamples) env = static_cast<float>(i) / kFadeSamples;
+                    else if (i + kFadeSamples > kNoteSamples) env = static_cast<float>(kNoteSamples - i) / kFadeSamples;
+                    pcm[pos + i] = static_cast<std::int16_t>(
+                        kAmplitude * env * std::sin(kTwoPi * freq * static_cast<float>(i) / kRate));
+                }
+                pos += kNoteSamples + kGapSamples;  // gap stays zero (calloc)
+            }
+            M5.Speaker.playRaw(pcm, kTotal, kRate, /*stereo=*/false);
+            while (M5.Speaker.isPlaying()) {
+                vTaskDelay(pdMS_TO_TICKS(20));
+            }
+            heap_caps_free(pcm);
+        } else {
+            ESP_LOGW(kTag, "startup melody: PSRAM alloc failed, skipped");
         }
     } else {
         ESP_LOGI(kTag, "startup arpeggio disabled");
