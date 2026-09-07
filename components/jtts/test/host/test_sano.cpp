@@ -114,7 +114,7 @@ void test_synthesis(const char* path) {
     int peak = 0;
     for (auto v : pcm) peak = std::max(peak, std::abs(static_cast<int>(v)));
     std::printf("       peak %d\n", peak);
-    check(peak > 0.55 * 32760 && peak <= 0.6 * 32760 + 8, "peak normalised to gain 0.6");
+    check(peak > 0.85 * 32760 && peak <= 0.9 * 32760 + 8, "peak normalised to 0.9 at default gain 0.6");
 
     // Auto はモデルがあれば Sano を選ぶ (Formant より長い 22.05 kHz 由来の長さで判別)
     Options auto_opt;

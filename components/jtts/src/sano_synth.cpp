@@ -91,7 +91,13 @@ constexpr std::size_t kMaxSamples = static_cast<std::size_t>(SAAN_SR) * 30u;
 constexpr float kBaseMoraMs = 110.0f;
 constexpr float kTempoMin = 0.5f, kTempoMax = 2.0f;
 
-// 音量正規化: ピークを opt.gain に合わせるが、無音に近い出力を増幅しすぎない。
+// 音量正規化: 発話のピークを kPeakTarget に合わせる (opt.gain は既定 0.6 に対する
+// 相対倍率として掛ける)。CoreS3 では M5Unified の出力ゲインが音量 128 (100%) で
+// ちょうど等倍なので、ピーク 0.9 = 歪まない範囲で最大に近いレベル。実機で 0.6 だと
+// 小さく聞こえた (2026-09-07)。無音に近い出力を増幅しすぎないよう倍率は 4 倍まで。
+constexpr float kPeakTarget = 0.9f;
+constexpr float kDefaultGain = 0.6f;
+constexpr float kPeakCeiling = 0.98f;
 constexpr float kMaxGainBoost = 4.0f;
 constexpr float kSilencePeak = 1e-4f;
 
@@ -239,10 +245,11 @@ bool synthesize_pcm(const std::vector<std::int32_t>& ids, float s_v, Synthesized
     return true;
 }
 
-// 発話のピークを gain に合わせる倍率 (他エンジンと音量と口の開きを揃える)。
+// 発話のピークを目標レベルに合わせる倍率 (他エンジンと音量と口の開きを揃える)。
 float normalize_scale(float peak, float gain) {
     if (peak <= kSilencePeak) return 1.0f;
-    return std::min(gain / peak, kMaxGainBoost);
+    const float target = std::min(kPeakTarget * gain / kDefaultGain, kPeakCeiling);
+    return std::min(target / peak, kMaxGainBoost);
 }
 
 internal::SincResampler g_resampler;
