@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -141,5 +142,39 @@ bool set_sano_model(std::span<const std::uint8_t> blob);
 
 // sanoTTS モデルがロード済みか。
 bool sano_model_loaded();
+
+// sanoTTS のストリーミング合成 (Engine::Sano 専用)。synthesize() が発話全体を作って
+// から返すのに対し、こちらは begin() で総サンプル数を確定したあと pull() でチャンク
+// (最大 kChunkSamples = 2,048 sample ≈ 93 ms) ずつ取り出せるので、呼び出し側は
+// 先読みぶんが貯まった時点で鳴らし始められる (main/sano_stream_player.cpp)。
+// begin() から end() (またはデストラクタ) までモデルの排他ロックを握るので、
+// 同時に走らせられるストリームは 1 本。
+// CONFIG_JTTS_ENABLE_SANO 無効ビルドでは begin() が常に false。
+class SanoStream {
+public:
+    static constexpr std::size_t kChunkSamples = 2048;
+
+    SanoStream();
+    ~SanoStream();
+    SanoStream(const SanoStream&) = delete;
+    SanoStream& operator=(const SanoStream&) = delete;
+
+    // 読み → ids → duration を確定。モデル無し / 読めない / 350 ids 超 / メモリ不足は false
+    // (呼び出し側は synthesize() の一括経路にフォールバックする)。
+    bool begin(std::u32string_view kana, const Options& opt);
+    // 発話の総サンプル数 (n_frames × 256)。begin() 成功後に有効。
+    std::size_t total_samples() const;
+    // 出力レート。常に 22050。
+    std::uint32_t sample_rate() const;
+    // 次のチャンクを int16 で書く。戻り値 = 書いたサンプル数 (0 = 終わり、負 = エラー)。
+    // cap は kChunkSamples 以上であること。
+    int pull(std::int16_t* out, std::size_t cap);
+    // 作業領域とロックを解放する。
+    void end();
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
 
 }  // namespace stackchan::jtts

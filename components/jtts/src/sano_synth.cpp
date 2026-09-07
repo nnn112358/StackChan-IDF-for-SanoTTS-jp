@@ -44,6 +44,7 @@
 #include <string>
 
 #include "resampler.hpp"
+#include "synth_dsp.hpp"
 
 extern "C" {
 #include "g2p.h"
@@ -305,6 +306,87 @@ bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const
 
 }  // namespace internal
 
+// ---- ストリーミング API ----------------------------------------------------------
+
+struct SanoStream::Impl {
+    std::unique_lock<std::mutex> lock;   // begin() 〜 end() でモデルを占有
+    ArenaPtr arena;
+    saan_arena a{};
+    saan_stream st{};
+    std::vector<std::int32_t> ids;
+    std::vector<float> chunk;
+    std::size_t total = 0;
+    float scale = 1.0f;
+    bool active = false;
+};
+
+SanoStream::SanoStream() : impl_(std::make_unique<Impl>()) {}
+SanoStream::~SanoStream() { end(); }
+
+bool SanoStream::begin(std::u32string_view kana, const Options& opt) {
+    end();
+    std::unique_lock<std::mutex> lock(g_model.mutex);
+    if (!g_model.loaded) return false;
+    if (!text_to_ids(kana, impl_->ids)) return false;
+    impl_->arena = alloc_arena();
+    if (!impl_->arena) {
+        SANO_LOGW("arena %u B alloc failed", static_cast<unsigned>(kArenaBytes));
+        return false;
+    }
+    saan_arena_init(&impl_->a, impl_->arena.get(), kArenaBytes);
+    const auto n_ids = static_cast<std::int32_t>(impl_->ids.size());
+    const float s_v = SAAN_S_V * tempo_scale(opt.mora_ms);
+    const saan_status s = saan_stream_init(&impl_->st, &g_model.weights, &impl_->a, impl_->ids.data(), n_ids, s_v);
+    if (s != SAAN_OK) {
+        SANO_LOGW("saan_stream_init: %s", saan_strerror(s));
+        return false;
+    }
+    if (impl_->a.used != saan_stream_arena_used(n_ids)) {
+        SANO_LOGW("arena used %u B != expected %u B — refusing to pull",
+                  static_cast<unsigned>(impl_->a.used), static_cast<unsigned>(saan_stream_arena_used(n_ids)));
+        return false;
+    }
+    impl_->total = static_cast<std::size_t>(impl_->st.n_frames) * SAAN_HOP;
+    if (impl_->total == 0 || impl_->total > kMaxSamples) {
+        SANO_LOGW("utterance %u samples out of range", static_cast<unsigned>(impl_->total));
+        return false;
+    }
+    impl_->chunk.assign(static_cast<std::size_t>(SAAN_CHUNK) * SAAN_HOP, 0.0f);
+    impl_->scale = opt.gain / kDefaultGain;
+    impl_->lock = std::move(lock);
+    impl_->active = true;
+    SANO_LOGI("stream: %d ids / %d frames / %u samples (%.0f ms) @%d Hz", static_cast<int>(n_ids),
+              static_cast<int>(impl_->st.n_frames), static_cast<unsigned>(impl_->total),
+              1000.0 * static_cast<double>(impl_->total) / SAAN_SR, static_cast<int>(SAAN_SR));
+    return true;
+}
+
+std::size_t SanoStream::total_samples() const { return impl_->active ? impl_->total : 0; }
+std::uint32_t SanoStream::sample_rate() const { return static_cast<std::uint32_t>(SAAN_SR); }
+
+int SanoStream::pull(std::int16_t* out, std::size_t cap) {
+    if (!impl_->active || out == nullptr || cap < kChunkSamples) return -1;
+    std::int32_t n = 0;
+    const saan_status s = saan_stream_pull(&impl_->st, impl_->chunk.data(), &n);
+    if (s != SAAN_OK) {
+        SANO_LOGW("saan_stream_pull: %s", saan_strerror(s));
+        return -1;
+    }
+    if (n <= 0) return 0;
+    const std::size_t ns = static_cast<std::size_t>(n) * SAAN_HOP;
+    for (std::size_t i = 0; i < ns; ++i) out[i] = internal::dsp::to_i16(impl_->chunk[i] * impl_->scale);
+    return static_cast<int>(ns);
+}
+
+void SanoStream::end() {
+    if (!impl_ || !impl_->active) return;
+    impl_->active = false;
+    impl_->arena.reset();
+    impl_->chunk.clear();
+    impl_->chunk.shrink_to_fit();
+    if (impl_->lock.owns_lock()) impl_->lock.unlock();
+}
+
 bool set_sano_model(std::span<const std::uint8_t> blob) {
     std::lock_guard<std::mutex> lock(g_model.mutex);
     g_model.loaded = false;
@@ -344,6 +426,15 @@ namespace stackchan::jtts {
 
 bool set_sano_model(std::span<const std::uint8_t>) { return false; }
 bool sano_model_loaded() { return false; }
+
+struct SanoStream::Impl {};
+SanoStream::SanoStream() = default;
+SanoStream::~SanoStream() = default;
+bool SanoStream::begin(std::u32string_view, const Options&) { return false; }
+std::size_t SanoStream::total_samples() const { return 0; }
+std::uint32_t SanoStream::sample_rate() const { return 22050; }
+int SanoStream::pull(std::int16_t*, std::size_t) { return -1; }
+void SanoStream::end() {}
 
 namespace internal {
 bool render_sano(std::u32string_view, std::vector<std::int16_t>&, const Options&, std::uint32_t&) {

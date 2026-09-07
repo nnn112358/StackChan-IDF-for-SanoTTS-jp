@@ -139,6 +139,26 @@ void test_synthesis(const char* path) {
     check(static_cast<bool>(synthesize(U"漢字だけ", pcm_fb, auto_opt)) == false || !pcm_fb.empty(),
           "unpronounceable text falls through without crashing");
 
+    // ストリーミング API: 一括 synthesize と同じサンプル列になること
+    {
+        SanoStream st;
+        check(st.begin(U"きょ][おわよ][いて][んきです°ね", opt), "SanoStream::begin");
+        check(st.total_samples() == pcm.size(), "stream total_samples == synthesize size");
+        std::vector<std::int16_t> streamed;
+        std::vector<std::int16_t> buf(SanoStream::kChunkSamples);
+        int chunks = 0;
+        for (;;) {
+            const int n = st.pull(buf.data(), buf.size());
+            if (n <= 0) { check(n == 0, "stream pull ends cleanly"); break; }
+            streamed.insert(streamed.end(), buf.begin(), buf.begin() + n);
+            ++chunks;
+        }
+        st.end();
+        std::printf("       %d chunks, %zu samples\n", chunks, streamed.size());
+        check(streamed == pcm, "streamed samples are bit-identical to synthesize()");
+        check(!st.begin(U"漢字", opt), "stream begin rejects unpronounceable text");
+    }
+
     check(set_sano_model({}), "unload model");
     check(!sano_model_loaded(), "unloaded");
 }

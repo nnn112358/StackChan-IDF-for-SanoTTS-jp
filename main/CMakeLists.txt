@@ -61,6 +61,7 @@ set(_main_srcs
     "voice_db.cpp"
     "hmm_voice.cpp"
     "sano_model.cpp"
+    "sano_stream_player.cpp"
     "wifi_sta.cpp"
 )
 if(CONFIG_STACKCHAN_CONVERSATION_ENABLED)

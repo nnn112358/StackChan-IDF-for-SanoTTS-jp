@@ -6,6 +6,7 @@
 #include "voice_db.hpp"
 #include "hmm_voice.hpp"
 #include "sano_model.hpp"
+#include "sano_stream_player.hpp"
 
 #include <cstdio>
 #include <memory>
@@ -210,6 +211,14 @@ void start_say_worker(std::string_view kana_utf8)
             stackchan::jtts::Options opt = g_say_opts_ready
                 ? g_say_opts
                 : stackchan::app::resolve_speech_options("", stackchan::app::Speech::kSampleRate);
+            // sanoTTS はストリーミング (合成しながら再生 + リップシンク)。モデル無し /
+            // 読めない / 長すぎるときは false なので、従来の一括経路 (他エンジン) に落とす。
+            if ((opt.engine == stackchan::jtts::Engine::Auto || opt.engine == stackchan::jtts::Engine::Sano) &&
+                stackchan::app::speak_streaming(kana, opt, g_state)) {
+                stackchan::wifi_config::mcp_events::publish_say_done();
+                vTaskDeleteWithCaps(nullptr);
+                return;
+            }
             std::uint32_t rate = opt.sample_rate_hz;  // sanoTTS は 22.05 kHz を返す
             std::vector<std::int16_t> pcm;
             if (auto r = stackchan::jtts::synthesize(kana, pcm, opt, &rate); !r) {
