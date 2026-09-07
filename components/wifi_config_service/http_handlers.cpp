@@ -144,6 +144,7 @@ VoiceDbStatusGetter g_voice_db_status_getter = nullptr;
 HmmVoiceSink g_hmm_voice_sink = nullptr;
 HmmVoiceStatusGetter g_hmm_voice_status_getter = nullptr;
 SanoModelStatusGetter g_sano_model_status_getter = nullptr;
+ServoPoseSink g_servo_pose_sink = nullptr;
 CameraCaptureSink g_camera_capture_sink = nullptr;
 CameraRegSink g_camera_reg_sink = nullptr;
 McpSayKanaSink g_mcp_say_sink = nullptr;
@@ -759,6 +760,57 @@ esp_err_t handle_conv_headers_post(httpd_req_t* req)
     xSemaphoreTake(g_mutex, portMAX_DELAY);
     g_staging.set_str("conv-headers", std::move(body));
     xSemaphoreGive(g_mutex);
+    return send_empty(req);
+}
+
+// POST /api/servo-pose — 首の姿勢を直接指定する。
+//   {"yaw":20,"pitch":-10,"time_ms":400}   … 両軸を 400 ms で移動
+//   {"yaw":0}                              … yaw だけ正面へ (pitch は保持)
+//   {"pitch":-8,"speed":800}               … 速度指定 (time_ms 省略時)
+// 角度はサーボ タスクが可動域 (ServoLimits) にクランプする。サーボが無効
+// (`/api/servo-enabled` = 0) / 範囲設定モード中は無視される。
+esp_err_t handle_servo_pose_post(httpd_req_t* req)
+{
+    if (!require_auth(req)) return ESP_OK;
+    std::string body;
+    if (read_body_str(req, body, 128) != ESP_OK) return ESP_OK;
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (root == nullptr || !cJSON_IsObject(root)) {
+        if (root != nullptr) cJSON_Delete(root);
+        return send_error(req, "400 Bad Request", "body must be a JSON object");
+    }
+    ServoPose pose;
+    bool bad = false;
+    auto num = [&](const char* key, float lo, float hi, float& out, bool& has) {
+        const cJSON* item = cJSON_GetObjectItemCaseSensitive(root, key);
+        if (item == nullptr || cJSON_IsNull(item)) return;
+        if (!cJSON_IsNumber(item) || item->valuedouble < lo || item->valuedouble > hi) {
+            bad = true;
+            return;
+        }
+        out = static_cast<float>(item->valuedouble);
+        has = true;
+    };
+    float dummy = 0.0f;
+    bool has_dummy = false;
+    num("yaw", -180.0f, 180.0f, pose.yaw_deg, pose.has_yaw);
+    num("pitch", -180.0f, 180.0f, pose.pitch_deg, pose.has_pitch);
+    num("time_ms", 0.0f, 30000.0f, dummy, has_dummy);
+    if (has_dummy) pose.time_ms = static_cast<std::uint16_t>(dummy);
+    dummy = 0.0f;
+    has_dummy = false;
+    num("speed", 0.0f, 4095.0f, dummy, has_dummy);
+    if (has_dummy) pose.speed = static_cast<std::uint16_t>(dummy);
+    cJSON_Delete(root);
+    if (bad) return send_error(req, "400 Bad Request", "yaw/pitch -180..180, time_ms 0..30000, speed 0..4095");
+    if (!pose.has_yaw && !pose.has_pitch) {
+        return send_error(req, "400 Bad Request", "give at least one of yaw / pitch");
+    }
+    xSemaphoreTake(g_mutex, portMAX_DELAY);
+    ServoPoseSink sink = g_servo_pose_sink;
+    xSemaphoreGive(g_mutex);
+    if (!sink) return send_error(req, "503 Service Unavailable", "servo pose sink not registered");
+    sink(pose);
     return send_empty(req);
 }
 
@@ -1939,6 +1991,7 @@ void register_handlers(httpd_handle_t server, const config::DeviceConfig& curren
     add(server, "/api/jtts-config",     HTTP_POST, handle_jtts_config_post);
     add(server, "/api/servo-limits",    HTTP_POST, handle_servo_limits_post);
     add(server, "/api/servo-range-mode", HTTP_POST, handle_servo_range_mode_post);
+    add(server, "/api/servo-pose",       HTTP_POST, handle_servo_pose_post);
     add(server, "/api/system-prompt",   HTTP_POST, handle_system_prompt_post);
     add(server, "/api/conv-headers",     HTTP_POST, handle_conv_headers_post);
     add(server, "/api/settings",        HTTP_GET,  handle_settings_get);
@@ -2202,6 +2255,17 @@ void set_sano_model_status_getter(SanoModelStatusGetter getter)
     }
     xSemaphoreTake(g_mutex, portMAX_DELAY);
     g_sano_model_status_getter = std::move(getter);
+    xSemaphoreGive(g_mutex);
+}
+
+void set_servo_pose_sink(ServoPoseSink sink)
+{
+    if (g_mutex == nullptr) {
+        g_servo_pose_sink = std::move(sink);
+        return;
+    }
+    xSemaphoreTake(g_mutex, portMAX_DELAY);
+    g_servo_pose_sink = std::move(sink);
     xSemaphoreGive(g_mutex);
 }
 

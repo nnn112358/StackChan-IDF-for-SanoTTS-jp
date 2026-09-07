@@ -68,6 +68,26 @@ void on_face_config(std::string_view json)
 // Range-mode sink + live-positions getter shared by BLE and Wi-Fi services.
 // Sink mutates SharedState; the servo task picks up the flag on its next
 // iteration and disables/enables torque accordingly.
+// `POST /api/servo-pose`: 首の目標姿勢を SharedState に書く。サーボ タスクが次の周期で
+// 拾い、可動域 (ServoLimits) にクランプして駆動する。省略された軸は今の目標のまま。
+void on_servo_pose(const stackchan::wifi_config::ServoPose& pose)
+{
+    if (g_state == nullptr) return;
+    // 速度・時間を先に書く (サーボ タスクは目標の変化を見て駆動を決めるため)。
+    g_state->servo.move_time_ms.store(pose.time_ms, std::memory_order_relaxed);
+    g_state->servo.speed_override.store(pose.speed, std::memory_order_relaxed);
+    if (pose.has_yaw) {
+        g_state->servo.target_yaw_deg.store(pose.yaw_deg, std::memory_order_relaxed);
+    }
+    if (pose.has_pitch) {
+        g_state->servo.target_pitch_deg.store(pose.pitch_deg, std::memory_order_relaxed);
+    }
+    ESP_LOGI(kTag, "servo pose: yaw %s%.1f / pitch %s%.1f (%s)",
+             pose.has_yaw ? "" : "keep ", static_cast<double>(pose.yaw_deg),
+             pose.has_pitch ? "" : "keep ", static_cast<double>(pose.pitch_deg),
+             pose.time_ms != 0 ? "time-based" : (pose.speed != 0 ? "speed override" : "default speed"));
+}
+
 void on_servo_range_mode(bool on)
 {
     if (g_state != nullptr) {
@@ -510,6 +530,9 @@ void register_avatar_bytecode_sinks()
             const auto st = hmm_voice::status();
             return {st.loaded, st.stored_bytes, st.capacity};
         });
+
+    // 首の姿勢 (POST /api/servo-pose)。発話の前後に外部からおじぎ・首振りをさせる入口。
+    stackchan::wifi_config::set_servo_pose_sink(&on_servo_pose);
 
     // sanoTTS モデル (GET /api/sano-model — 状態のみ。書き込みは make flash / 一括イメージ)。
     stackchan::wifi_config::set_sano_model_status_getter(

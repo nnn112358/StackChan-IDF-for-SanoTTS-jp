@@ -212,8 +212,8 @@ CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 # exhausted is a TCP retransmit (latency, not loss).
 CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=10
 
-# Firmware-embedded default face. This fork ships the aNo研「プリンを守る技術」
-# face (cyan background, black angry brows / round eyes / rectangular mouth,
-# assets/purin_face.avdsl). The Stack-chan standard face stays available as
-# the "default" preset on the settings page / via POST /api/avatar-dsl.
-CONFIG_AVATAR_DEFAULT_FACE="purin_face.avdsl"
+# Firmware-embedded default face. Stack-chan の標準顔 (assets/default_face.avdsl)。
+# aNo研「プリンを守る技術」ベースのシアンの顔は assets/purin_face.avdsl に残してあり、
+# 設定ページのプリセット "purin" / POST /api/avatar-dsl で使える。ビルトインを差し替える
+# なら CONFIG_AVATAR_DEFAULT_FACE="purin_face.avdsl"。
+CONFIG_AVATAR_DEFAULT_FACE="default_face.avdsl"

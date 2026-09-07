@@ -71,6 +71,21 @@ void set_settings_hooks(const config::SettingsHooks& hooks);
 // config_service.hpp for the contract; the Wi-Fi service shares the same
 // types. POST /api/servo-range-mode forwards to the sink; /api/status pulls
 // from the getter.
+// 首の姿勢を直接指定する (`POST /api/servo-pose`)。外部スクリプトが発話の前後に
+// おじぎ・首振りをさせるための入口。yaw / pitch は度、省略された軸は現在の目標を保つ。
+// time_ms != 0 なら両軸がその時間で到達 (SCS0009 の goal-time)、0 なら speed で駆動
+// (speed も 0 ならサーボ タスクの既定速度)。サーボ タスクが可動域にクランプする。
+struct ServoPose {
+    bool has_yaw = false;
+    bool has_pitch = false;
+    float yaw_deg = 0.0f;
+    float pitch_deg = 0.0f;
+    std::uint16_t time_ms = 0;
+    std::uint16_t speed = 0;
+};
+using ServoPoseSink = std::function<void(const ServoPose&)>;
+void set_servo_pose_sink(ServoPoseSink sink);
+
 void set_servo_range_mode_sink(config::ServoRangeModeSink sink);
 void set_servo_positions_getter(config::ServoPositionsGetter getter);
 

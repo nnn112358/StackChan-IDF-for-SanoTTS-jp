@@ -391,6 +391,11 @@ void set_sano_model_status_getter(SanoModelStatusGetter getter)
     http::set_sano_model_status_getter(std::move(getter));
 }
 
+void set_servo_pose_sink(ServoPoseSink sink)
+{
+    http::set_servo_pose_sink(std::move(sink));
+}
+
 void set_camera_capture_sink(CameraCaptureSink sink)
 {
     http::set_camera_capture_sink(std::move(sink));
