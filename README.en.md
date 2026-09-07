@@ -53,7 +53,7 @@ appropriately.
 - **Servos**: SCS0009 yaw + pitch over UART1 (1 Mbps). Trapezoidal-velocity
   `PathGenerator`; torque only engaged while moving. Per-board range
   calibration (ServoLimits) persisted in NVS.
-- **Speaker / audio**: Boot arpeggio (C5–E5–G5, can be disabled), jtts random
+- **Speaker / audio**: Boot arpeggio (C5–D5–E5–F5–G5 (do-re-mi-fa-so), can be disabled), jtts random
   babble, AAC record + playback, BLE audio streaming, Wi-Fi RTP receive
   (L16 / μ-law / AAC). Volume is **0..200%**, live-controlled from BLE /
   Wi-Fi / on-device UI.
@@ -130,7 +130,7 @@ compile-time default can be given via `sdkconfig.defaults.local` (gitignored).
 
 ## Boot sequence (CoreS3 default path)
 
-1. M5 / Avatar init, startup arpeggio (C5–E5–G5, can be disabled).
+1. M5 / Avatar init, startup arpeggio (C5–D5–E5–F5–G5 (do-re-mi-fa-so), can be disabled).
 2. Load settings from NVS, start the BLE settings service (always advertising).
 3. If an SSID is stored, start the Wi-Fi STA connection (non-blocking).
    On STA up → start mDNS + HTTP config server + SNTP.

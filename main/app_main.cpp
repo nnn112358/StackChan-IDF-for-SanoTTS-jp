@@ -476,7 +476,8 @@ extern "C" void app_main()
     // is clamped at 255 so boards already at 255 are unchanged at 100 %.
     stackchan::app::settings_sinks::apply_speaker_volume(cfg.speaker_volume_pct);
     if (cfg.startup_arpeggio_enabled) {
-        for (float freq : {523.25f, 659.25f, 783.99f}) { // C5 – E5 – G5
+        // ドレミファソ (C5 D5 E5 F5 G5)。元の C5–E5–G5 アルペジオから変更。
+        for (float freq : {523.25f, 587.33f, 659.25f, 698.46f, 783.99f}) {
             M5.Speaker.tone(freq, 150);
             vTaskDelay(pdMS_TO_TICKS(180));
         }
@@ -495,9 +496,12 @@ extern "C" void app_main()
     // contention instead). If this probe is also silent while the
     // arpeggio (48 kHz tone) was audible, the codec / I2S clock chain
     // doesn't like the 16 kHz fs.
-    // Bring-up diagnostic: follows the startup-sound setting so a user who
-    // silenced the arpeggio doesn't still get a loud 440 Hz beep at boot.
-    if (cfg.startup_arpeggio_enabled) {
+    // Bring-up diagnostic (Module Audio line-out debugging). Off by default:
+    // a bare 440 Hz beep right after the boot melody reads as noise. Flip
+    // kBootPlayRawProbe when chasing a silent-JTTS bug; it still honours
+    // the startup-sound setting.
+    constexpr bool kBootPlayRawProbe = false;
+    if (kBootPlayRawProbe && cfg.startup_arpeggio_enabled) {
         constexpr std::uint32_t kProbeRate = 16'000;
         constexpr std::size_t kProbeSamples = kProbeRate * 300 / 1000; // 300 ms
         static std::int16_t probe_pcm[kProbeSamples];

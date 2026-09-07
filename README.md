@@ -51,7 +51,7 @@ Pages サイトに反映されます。
 - **サーボ**: SCS0009 yaw + pitch を UART1 (1 Mbps) で制御。台形速度
   プロファイル `PathGenerator`、駆動時のみトルク有効化。ボード別レンジ
   キャリブレーション (ServoLimits) を NVS 保存。
-- **スピーカー / オーディオ**: 起動音 (C5–E5–G5、設定で OFF 可)、jtts ランダム
+- **スピーカー / オーディオ**: 起動音 (C5–D5–E5–F5–G5 (ドレミファソ)、設定で OFF 可)、jtts ランダム
   babble、AAC 録音再生、BLE オーディオ ストリーム、Wi-Fi RTP (L16 / μ-law / AAC) 受信。
   音量は **0..200%** をライブ制御 (BLE / Wi-Fi / 本体 UI)。
 - **sanoTTS-jp ニューラル TTS** (CoreS3): [sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp)
@@ -132,7 +132,7 @@ OpenAI / Gemini の API キーはビルドに埋め込まず、BLE / Wi-Fi 設�
 
 ## 起動シーケンス (CoreS3 標準パス)
 
-1. M5 / Avatar 初期化、起動音 (C5–E5–G5 アルペジオ、設定で OFF 可)
+1. M5 / Avatar 初期化、起動音 (ドレミファソ C5–D5–E5–F5–G5、設定で OFF 可)
 2. NVS から設定読み込み → BLE 設定サービス起動 (常時 advertising)
 3. SSID があれば Wi-Fi STA 接続を非ブロッキング開始
    - STA 接続後 → mDNS + HTTP 設定サーバー + SNTP 開始
