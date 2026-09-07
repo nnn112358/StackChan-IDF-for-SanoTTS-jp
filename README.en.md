@@ -128,12 +128,8 @@ needs a full USB flash**. The dictionary is too large for git; fetch it with
 | **Speaking-rate correction** | `CONFIG_JTTS_SANO_SPEED_PCT` (default 125 = durations × 1.25), because the model speaks quickly as trained |
 | **`POST /api/servo-pose`** | Set the head pose in degrees — the hook for nodding before and after an utterance |
 | **`purin` face preset** | Based on aNo-Lab's "[プリンを守る技術](https://github.com/anoken/purin_wo_mamoru_gijutsu/)" ([assets/purin_face.avdsl](assets/purin_face.avdsl)); switch from the settings page or `POST /api/avatar-dsl`, built-in default via `CONFIG_AVATAR_DEFAULT_FACE` |
-| **Startup sound** | do-re-mi-fa-so (C5–D5–E5–F5–G5), off by default, played as a faded sine so it does not distort |
 
 ## What this fork disables
-
-**No upstream source file was deleted.** Only flash content and a few defaults change, and
-every item below comes back by flipping the build configuration.
 
 ### Disabled in the regular build (`cores3`)
 
