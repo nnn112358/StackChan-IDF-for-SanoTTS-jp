@@ -1,3 +1,9 @@
+> **Note**: this is the upstream stackchan-idf document, kept for reference.
+> This repository is **StackChan-IDF-for-SanoTTS-jp**, a fork that adds the
+> [sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp) neural Japanese TTS engine
+> (on-device synthesis, streaming playback, avatar lip sync, optional on-device
+> kanji G2P). See [README.md](README.md) (Japanese) for what the fork adds.
+
 [日本語](README.md)
 
 # stackchan-idf
