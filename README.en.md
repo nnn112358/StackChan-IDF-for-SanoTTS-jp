@@ -117,6 +117,19 @@ The partition tables are [partitions_16mb.csv](partitions_16mb.csv) and
 needs a full USB flash**. The dictionary is too large for git; fetch it with
 `tools/get-sano-dict.sh`.
 
+## What this fork adds
+
+| Addition | Detail |
+|---|---|
+| **sanoTTS engine** | `jtts::Engine::Sano`, a fourth engine alongside formant / unit-concatenative / HMM, preferred by `auto`. Output is bit-identical to the upstream reference |
+| **Streaming playback** | Synthesis and playback overlap; the preroll comes from the previously measured xRT ([main/sano_stream_player.cpp](main/sano_stream_player.cpp)) |
+| **Lip sync** | A 16 ms peak envelope normalised against the loudest window, applied to the mouth every 10 ms from the playback position |
+| **On-device kanji G2P** | `BOARD=cores3-dict`: Open JTalk plus a 13.7 MB pruned dictionary supply reading and accent |
+| **Speaking-rate correction** | `CONFIG_JTTS_SANO_SPEED_PCT` (default 125 = durations × 1.25), because the model speaks quickly as trained |
+| **`POST /api/servo-pose`** | Set the head pose in degrees — the hook for nodding before and after an utterance |
+| **`purin` face preset** | Based on aNo-Lab's "[プリンを守る技術](https://github.com/anoken/purin_wo_mamoru_gijutsu/)" ([assets/purin_face.avdsl](assets/purin_face.avdsl)); switch from the settings page or `POST /api/avatar-dsl`, built-in default via `CONFIG_AVATAR_DEFAULT_FACE` |
+| **Startup sound** | do-re-mi-fa-so (C5–D5–E5–F5–G5), off by default, played as a faded sine so it does not distort |
+
 ## What this fork disables
 
 **No upstream source file was deleted.** Only flash content and a few defaults change, and
@@ -192,15 +205,6 @@ reaches xRT 0.45).
   - Yaw ID 1 / pitch ID 2, 1 step ≈ 0.3125°
 - AtomS3R / AtomS3 / StopWatch still build, but sanoTTS needs 16 MB flash plus PSRAM, so it is
   a CoreS3 feature
-
-## Other additions
-
-- **`purin` face preset** based on aNo-Lab's
-  "[プリンを守る技術](https://github.com/anoken/purin_wo_mamoru_gijutsu/)"
-  ([assets/purin_face.avdsl](assets/purin_face.avdsl)). Switch from the settings page or with
-  `POST /api/avatar-dsl`; the built-in default is selected by `CONFIG_AVATAR_DEFAULT_FACE`
-- **Startup sound**: do-re-mi-fa-so (C5–D5–E5–F5–G5), **off by default**, played as a faded
-  sine so it does not distort
 
 ## License
 

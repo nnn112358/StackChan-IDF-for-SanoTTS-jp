@@ -113,6 +113,19 @@ curl http://<device>/api/sano-model    # {"loaded":true,"dict":true,"capacity":6
 ときは USB でフル書き込み**が要ります。辞書は容量が大きいため git に入れず、
 `tools/get-sano-dict.sh` で取得します。
 
+## このフォークで追加したもの
+
+| 追加点 | 内容 |
+|---|---|
+| **sanoTTS エンジン** | `jtts::Engine::Sano`。既存の formant / 単位連結 / HMM に並ぶ 4 つ目のエンジンで、`auto` では最優先。合成結果は上流の記録値と bit 一致 |
+| **ストリーミング再生** | 合成しながら鳴らす。先読み量は前回実測の xRT から自動 ([main/sano_stream_player.cpp](main/sano_stream_player.cpp)) |
+| **リップシンク** | 16 ms 窓のピーク包絡を発話内の最大値で正規化し、再生位置から 10 ms ごとに口の開きを更新 |
+| **端末内漢字 G2P** | `BOARD=cores3-dict`。Open JTalk + 枝刈り辞書 13.7 MB で読みとアクセントを付ける |
+| **話速の補正** | `CONFIG_JTTS_SANO_SPEED_PCT` (既定 125 = 継続長 1.25 倍)。モデルが速めなので既定でゆっくりに |
+| **`POST /api/servo-pose`** | 首の姿勢を度で直接指定。発話の前後におじぎ・首振りをさせる入口 |
+| **顔プリセット `purin`** | aNo研「[プリンを守る技術](https://github.com/anoken/purin_wo_mamoru_gijutsu/)」ベースの顔 ([assets/purin_face.avdsl](assets/purin_face.avdsl))。設定ページのプリセット / `POST /api/avatar-dsl` で切り替え、組み込みデフォルトは `CONFIG_AVATAR_DEFAULT_FACE` |
+| **起動音** | ドレミファソ (C5–D5–E5–F5–G5)、既定 OFF。フェード付き正弦波で歪みを避ける |
+
 ## このフォークで無効化したもの
 
 **上流のソースは 1 つも消していません。** 変えたのは「flash に載せる中身」と「既定値」だけで、
@@ -184,14 +197,6 @@ curl http://<device>/api/sano-model    # {"loaded":true,"dict":true,"capacity":6
   - Yaw ID = 1 / Pitch ID = 2、1 step ≈ 0.3125°
 - AtomS3R / AtomS3 / StopWatch でもビルドできますが、sanoTTS は 16 MB flash + PSRAM が要るため
   CoreS3 向けの機能です
-
-## その他の追加点
-
-- **顔プリセット `purin`**: aNo研「[プリンを守る技術](https://github.com/anoken/purin_wo_mamoru_gijutsu/)」
-  ベースの顔 ([assets/purin_face.avdsl](assets/purin_face.avdsl))。設定ページのプリセット、
-  または `POST /api/avatar-dsl` で切り替え。組み込みデフォルトは
-  `CONFIG_AVATAR_DEFAULT_FACE` で変えられます
-- **起動音**: ドレミファソ (C5–D5–E5–F5–G5)、**既定 OFF**。フェード付き正弦波で歪みを避けています
 
 ## ライセンス
 
