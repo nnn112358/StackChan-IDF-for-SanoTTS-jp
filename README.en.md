@@ -117,25 +117,26 @@ The partition tables are [partitions_16mb.csv](partitions_16mb.csv) and
 needs a full USB flash**. The dictionary is too large for git; fetch it with
 `tools/get-sano-dict.sh`.
 
-## What this fork removes
+## What this fork disables
 
-**No upstream source file was deleted.** What is removed is flash content and a few defaults.
+**No upstream source file was deleted.** Only flash content and a few defaults change, and
+every item below comes back by flipping the build configuration.
 
-### Removed from the regular build (`cores3`)
+### Disabled in the regular build (`cores3`)
 
-| Removed | Reason / impact |
+| Disabled | Reason / impact |
 |---|---|
 | esp-sr model partition 2.9 MB → **1.9 MB** | 1 MB handed over to the sanoTTS weights. The offset is unchanged, so an already-flashed model still works, and one Japanese wake word (`srmodels.bin`, ~290 KB) fits comfortably |
 | The 440 Hz boot probe tone | A bring-up beep for the 16 kHz playback path that used to sound on every boot. Off by default now (`kBootPlayRawProbe`) |
 | Startup arpeggio defaulting to on | Now off by default; re-enable from the settings page or over BLE |
 
-No feature is dropped here — conversation, OTA, camera, ASR, HMM and ESP-NOW all still work.
+No feature is disabled here — conversation, OTA, camera, ASR, HMM and ESP-NOW all still work.
 
-### Dropped from the dictionary build (`cores3-dict`)
+### Disabled in the dictionary build (`cores3-dict`)
 
-The 13.7 MB dictionary leaves room for only a single 2.19 MiB app, so these go:
+The 13.7 MB dictionary leaves room for only a single 2.19 MiB app, so these are switched off:
 
-| Dropped feature | Affected API |
+| Disabled feature | Affected API |
 |---|---|
 | OTA (two app slots → one) | `/api/ota/*`, `/api/release/versions` |
 | AI voice conversation (OpenAI / Gemini / XiaoZhi) | conversation tab, barge-in |
