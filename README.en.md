@@ -1,193 +1,199 @@
-> **Note**: this is the upstream stackchan-idf document, kept for reference.
-> This repository is **StackChan-IDF-for-SanoTTS-jp**, a fork that adds the
-> [sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp) neural Japanese TTS engine
-> (on-device synthesis, streaming playback, avatar lip sync, optional on-device
-> kanji G2P). See [README.md](README.md) (Japanese) for what the fork adds.
-
 [日本語](README.md)
 
-# stackchan-idf
+# StackChan-IDF-for-SanoTTS-jp
 
-Firmware for Stack-chan running on M5Stack CoreS3 / AtomS3R / AtomS3 / StopWatch (C152),
-written against ESP-IDF 5.5 / C++20. Supports AI voice conversation (OpenAI / Gemini /
-XiaoZhi), three configuration paths (BLE / Wi-Fi STA / SoftAP), and device-side OTA.
+Stack-chan firmware that speaks Japanese on an M5Stack CoreS3 — **entirely on the device**,
+with no cloud and no companion server. The avatar's mouth moves in time with the synthesised
+speech.
 
-## Web Flasher / Settings page
+This is a fork of [stackchan-idf](https://github.com/ciniml/stackchan-idf) that integrates
+[sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp) (a 559 K parameter distilled model,
+22.05 kHz) as a synthesis engine. ESP-IDF 5.5 / C++20.
 
-Released firmware can be flashed straight from the browser (Chrome / Edge):
+```
+reading (kana, or kanji text on the dictionary build)
+   → G2P (kana intermediate form / Open JTalk + dictionary)
+   → sanoTTS inference (W8A8 + ESP32-S3 integer SIMD, 176 KB arena)
+   → 22.05 kHz PCM played chunk by chunk (synthesis and playback overlap)
+   → mouth driven from the playback envelope
+```
 
-- **Flash**: <https://ciniml.github.io/stackchan-idf/>
-- **BLE Settings**: <https://ciniml.github.io/stackchan-idf/settings.html> (Web Bluetooth, desktop Chrome / Edge only)
-- **Wi-Fi Settings**: once the device is on Wi-Fi, `http://stackchan-XXXXXX.local/` (mDNS)
-- **iOS / SoftAP Settings**: trigger AP mode on-device (per-board, see below), scan the
-  Wi-Fi QR shown on the LCD with iPhone Camera → join → captive portal pops the
-  settings page automatically
+## What it does
 
-Push a tag `vX.Y.Z` and CI builds for all four boards, attaches the artifacts to
-a Release, and the Pages site picks them up automatically.
+- **Speak by posting a sentence to `POST /api/jtts-say`.** The dictionary build takes
+  kanji text as-is
+- **Playback starts before synthesis finishes.** The preroll is derived from the previously
+  measured real-time factor (xRT)
+- **Lip sync** from the amplitude at the current playback position
+- **Head motion** via `POST /api/servo-pose`, e.g. a nod before and after an utterance
+- Everything upstream still works: AI voice conversation, BLE / Wi-Fi / SoftAP configuration,
+  OTA, the Avatar DSL, dance, the LT timer, NeoPixel, four board variants
 
-## Supported boards
+## Quick start
 
-| Board | Slug | Display | Notable |
-|---|---|---|---|
-| CoreS3 + Stack-chan base | `cores3` | 320×240 IPS + touch | Default. 2 servos, head touch sensor, INA226 battery gauge |
-| CoreS3 + Takao Base | `cores3` | same | Half-duplex servo on Port A; no servo VM control / no battery gauge |
-| AtomS3R + Atomic ECHO BASE ("AtomNyan") | `atoms3r` | 128×128 LCD | No servos, ES8311 audio, BtnA-driven UI / AP toggle |
-| AtomS3 (no PSRAM) + ECHO BASE | `atoms3` | 128×128 LCD | Slim profile, no conversation / RTP |
-| M5 StopWatch (C152) | `stopwatch` | 466×466 round AMOLED + touch | No servos, gaze-follow on touch, ES8311 audio |
-
-Build with `make build BOARD=<slug>` (default `cores3`). The board is detected at
-boot and broadcast via `set_board_kind()` so UI tabs and feature toggles grey out
-appropriately.
-
-## Features
-
-- **AI voice conversation**: WebSocket to one of OpenAI Realtime / Google Gemini
-  Live / a XiaoZhi server, streaming mic input → reply audio with mouth-sync.
-  The half-duplex CoreS3 mutes the mic while speaking; interrupt a reply
-  (barge-in) with an LCD tap or a head touch (Si12T). Turns are detected by
-  server-side VAD. OpenAI / Gemini drive expression, head pose and robotic
-  speech via tools (`set_expression` / `set_head_pose` / `speak_katakoto`);
-  XiaoZhi maps its reply emotion to an expression. Reply text streams into
-  the balloon.
-- **Avatar rendering**: 30 fps with M5GFX. Breath / saccade / blink animators,
-  six expressions (Neutral / Happy / Sad / Angry / Doubt / Sleepy). The face
-  layout and animation is driven by an **Avatar DSL** (`.avdsl` source →
-  `.avbc` bytecode) that can be replaced live over BLE / Wi-Fi.
-- **Mic-driven lip-sync**: FFT + per-band log + spectral flux estimate of mouth
-  opening, with an EWMA noise-floor AGC for ambient drift.
-- **Servos**: SCS0009 yaw + pitch over UART1 (1 Mbps). Trapezoidal-velocity
-  `PathGenerator`; torque only engaged while moving. Per-board range
-  calibration (ServoLimits) persisted in NVS.
-- **Speaker / audio**: Boot arpeggio (C5–D5–E5–F5–G5 (do-re-mi-fa-so), can be disabled), jtts random
-  babble, AAC record + playback, BLE audio streaming, Wi-Fi RTP receive
-  (L16 / μ-law / AAC). Volume is **0..200%**, live-controlled from BLE /
-  Wi-Fi / on-device UI.
-- **NeoPixel**: Nekomimi LED-strip animations (rainbow / solid / lip-sync
-  level-meter mode).
-- **LT timer**: Talk-time assistant. "Soon" notice N seconds before the end,
-  on-the-dot announcement, repeated over-time call-outs (jtts).
-- **On-device UI**:
-  - CoreS3 / StopWatch (touch panel): tap top-right corner for a 5-tab UI
-    (info / settings / control / range / conversation / LT)
-  - AtomS3R / AtomS3 (button only): BtnA short-press toggles the status
-    overlay, long-press cycles `operation_mode`
-- **Speech balloon**: 24 px Japanese-capable Gothic font on a rounded white
-  panel; long text scrolls right-to-left as a marquee.
-- **BLE settings service** (NimBLE GATT): configure Wi-Fi, API keys and OTA
-  from `tools/settings.html` (Web Bluetooth). Bluetooth 4.2+ Just Works
-  pairing plus an application-layer X25519 + AES-256-GCM session, with
-  optional password auth. Settings land in NVS; Apply reboots.
-- **Wi-Fi settings service**: once Wi-Fi connects, the device serves an HTTP
-  server (port 80) + a built-in `settings_wifi.html`, advertised over mDNS
-  (`stackchan-XXXXXX.local`). Covers SSID, provider, API keys, system prompt,
-  extra HTTP headers, jtts, Avatar DSL, OTA — everything the BLE page covers.
-- **SoftAP provisioning (iOS-friendly)**: when STA is unset / failing, trigger
-  AP mode on-device (`Stackchan-XXXXXX` + WPA2). LCD shows a Wi-Fi QR; the
-  iPhone Camera scans → joins → **the captive portal automatically opens
-  `settings_wifi.html`** (DNS hijack + HTTP 404 catch-all). `require_auth`
-  is bypassed while AP is up, so the settings UI is immediately reachable.
-- **OTA updates**: dual OTA partitions, boot verification with rollback.
-  - **BLE**: settings.html → encrypted chunks
-  - **Wi-Fi local file**: upload a `.bin` from settings_wifi.html
-  - **Wi-Fi device-side fetch** (v0.7.4+): `POST /api/ota/release {tag}` —
-    the device pulls its own per-board binary from GitHub Pages over its
-    STA link and applies it (STA must be up).
-
-## Hardware (CoreS3 + Stack-chan base path)
-
-- M5Stack CoreS3 (ESP32-S3, 8 MB Quad-SPI PSRAM, 16 MB flash)
-- Stack-chan base (PY32 IO expander @ 0x6F, two SCS0009 servos)
-  - Internal I²C: AXP2101 (0x34) / touch (0x38) — managed by M5Unified
-  - PY32 pin 0: servo motor-voltage enable (wait 200 ms after ON before using the bus)
-  - Servo bus (SCS0009): UART1, TX GPIO 6 / RX GPIO 7, 1 Mbps, 8 N 1
-    - Yaw  ID = 1, zero_pos = 460
-    - Pitch ID = 2, zero_pos = 620
-  - 1 step ≈ 0.3125° (`deg = (raw - zero) * 5 / 16`)
-  - Head touch sensor Si12T @ 0x68 (3 zones, for nadenade / barge-in)
-- Other boards' pin layout: see each `sdkconfig.defaults.<board>` and
-  `components/board/board.cpp`.
-
-## Setup
-
-With ESP-IDF 5.5 installed (tested against 5.5.4; 5.4.2 still builds):
+With ESP-IDF 5.5 installed:
 
 ```sh
-git clone <this repo>
-cd stackchan-idf
+git clone https://github.com/nnn112358/StackChan-IDF-for-SanoTTS-jp
+cd StackChan-IDF-for-SanoTTS-jp
 git submodule update --init --recursive
-tools/apply-m5-patches.sh                    # apply the one-line M5Unified fix
-make set-target BOARD=cores3                 # first time only; per-board build dirs
+tools/apply-m5-patches.sh                             # small M5Unified fixes
+
+make set-target BOARD=cores3
 make build      BOARD=cores3
 make flash      BOARD=cores3 PORT=/dev/ttyACM0
-make monitor    BOARD=cores3 PORT=/dev/ttyACM0
 ```
 
-Replace `BOARD=` with `atoms3r` / `atoms3` / `stopwatch` to build for those
-boards; each lands under its own `build-<board>/` directory.
+To read kanji text on the device, use the dictionary profile (see "Build profiles"):
 
-`tools/apply-m5-patches.sh` just zero-initialises a `buf` array in
-`M5Unified` `RTC_PowerHub_Class::setAlarmIRQ` so it stops tripping the
-GCC 14 `-Werror=maybe-uninitialized` check.
-
-API keys for OpenAI / Gemini are not baked into the build — supply them at
-runtime from the BLE / Wi-Fi settings interface (stored in NVS). A
-compile-time default can be given via `sdkconfig.defaults.local` (gitignored).
-
-## Boot sequence (CoreS3 default path)
-
-1. M5 / Avatar init, startup arpeggio (C5–D5–E5–F5–G5 (do-re-mi-fa-so), can be disabled).
-2. Load settings from NVS, start the BLE settings service (always advertising).
-3. If an SSID is stored, start the Wi-Fi STA connection (non-blocking).
-   On STA up → start mDNS + HTTP config server + SNTP.
-4. Mic loopback test (record 2 s, play it back) as a sanity check.
-5. Servo power on → ping (Yaw / Pitch) → 1.5 s settle.
-6. Start the render task (30 fps face, core 1) and servo task (20 ms tick,
-   core 0). If conversation is enabled, the conversation task waits for
-   Wi-Fi and starts the AI dialogue.
-7. demo_loop begins — idle: random babble, random head pose, nadenade
-   reactions; during a conversation the AI task drives avatar + audio.
-8. Tap top-right for the on-device UI; tap the screen during a reply to
-   barge in; the Control tab's "AP モード" row enters SoftAP provisioning.
-
-## Repository layout
-
+```sh
+tools/get-sano-dict.sh                                # fetch the 13.7 MB dictionary (needs gh)
+make set-target BOARD=cores3-dict
+make build      BOARD=cores3-dict
+make flash      BOARD=cores3-dict PORT=/dev/ttyACM0   # ~2.5 min including the dictionary
 ```
-.
-├── components/
-│   ├── avatar/              face rendering + animators (breath / saccade / blink, 6 expressions)
-│   ├── avatar_vm/           Avatar DSL bytecode VM + NVS storage
-│   ├── board/               CoreS3 / AtomS3R / StopWatch HW bring-up (board auto-detect)
-│   ├── scs_servo/           SCS0009 driver + PathGenerator (trapezoidal velocity)
-│   ├── jtts/                Japanese katakoto TTS (babble / speak_katakoto / LT calls)
-│   ├── conversation/        AI voice-conversation clients (OpenAI / Gemini / XiaoZhi)
-│   ├── config_service/      BLE GATT settings service + NVS + OTA + X25519/AES-GCM
-│   ├── wifi_config_service/ Wi-Fi HTTP config + built-in web page + release OTA
-│   ├── telegram/            Telegram Bot API (TLS) notification client (oss)
-│   ├── M5GFX/               submodule (upstream)
-│   ├── M5Unified/           submodule (upstream + 1 patch)
-│   └── tl_expected/         tl::expected backport (submodule)
-├── main/                    app_main, render/servo task, demo_loop, ap_screen,
-│                            captive_portal, device_ui, atom_status, wifi_sta
-├── patches/                 upstream-targeted patches
-├── tools/                   apply-m5-patches.sh, monitor_log.py, settings.html,
-│                            avatar_dsl/ (compiler + WASM glue)
-├── assets/                  .avdsl sources (default_face, omega_mouth, aokko_face)
-├── partitions.csv           OTA layout (ota_0 / ota_1 / nvs / storage)
-├── sdkconfig.defaults*      shared + per-board (.cores3 / .atoms3r / .atoms3 / .stopwatch)
-└── Makefile                 thin wrapper around idf.py (BOARD= switch)
+
+The model weights (654 KB) ship in the repository and are written by `make flash`.
+Override the toolchain path with `IDF_PATH=` and the serial port with `PORT=`.
+
+Configure Wi-Fi through the BLE settings page, the SoftAP captive portal, or `tools/ble-cli`.
+
+## Usage
+
+```sh
+# Speak (kanji text works on the dictionary build)
+curl -X POST --data-binary "今日は良い天気ですね。" http://<device>/api/jtts-say
+
+# Move the head before / after speaking
+curl -X POST -d '{"yaw":25,"time_ms":400}'          http://<device>/api/servo-pose
+curl -X POST -d '{"yaw":0,"pitch":0,"time_ms":400}' http://<device>/api/servo-pose
+
+# Status
+curl http://<device>/api/sano-model    # {"loaded":true,"dict":true,"capacity":655360}
 ```
+
+### Writing readings
+
+On top of plain kana you can use sanoTTS' intermediate notation:
+
+| Mark | Meaning |
+|---|---|
+| `[` | pitch accent rise |
+| `]` | accent nucleus / fall (jtts' `'` maps to this) |
+| `#` | phrase boundary (`、` `。` `/` and spaces map to this) |
+| `°` | devoiced vowel |
+| `?` `?!` `?.` `?~` | question |
+
+Example: `きょ][おわよ][いて][んきです°ね` = "今日は良い天気ですね".
+On the dictionary build, send the kanji text instead and the dictionary decides the reading
+and the accent.
+
+### Voice settings
+
+Sent as JSON to `POST /api/jtts-config` (also editable from the settings page):
+
+| Field | Value |
+|---|---|
+| `engine` | `auto` (default, prefers sanoTTS) / `sano` / `hmm` / `unit` / `formant` |
+| `mora_ms` | speaking rate; 110 is unity, larger is slower |
+| `gain` | volume, relative to the 0.6 default |
+
+A build-time correction is applied on top (`CONFIG_JTTS_SANO_SPEED_PCT`, default 125 =
+durations × 1.25), because the model speaks quickly as trained.
+
+## Build profiles
+
+| | `cores3` (default) | `cores3-dict` |
+|---|---|---|
+| Input | kana + accent marks | **kana + kanji text** |
+| Flash layout | two OTA slots (4 MB each) + 1 MB sano | single 2.19 MiB app + sano + **13.1 MiB dictionary** |
+| App size | 3.68 MB (12 % free) | 2.08 MB (9 % free) |
+| OTA | yes | no (update over USB) |
+| Conversation / audio streaming / camera / ASR / HMM / ESP-NOW | yes | no |
+| Japanese fonts | 12 / 16 / 20 / 24 px | 16 px only |
+
+The partition tables are [partitions_16mb.csv](partitions_16mb.csv) and
+[partitions_16mb_dict.csv](partitions_16mb_dict.csv). They differ, so **switching profiles
+needs a full USB flash**. The dictionary is too large for git; fetch it with
+`tools/get-sano-dict.sh`.
+
+## How it works
+
+| Added part | Location |
+|---|---|
+| Inference core + kana G2P + kanji G2P (vendored upstream, MIT) | [components/saanotts_core](components/saanotts_core/README.md) |
+| Engine itself (blocking + streaming) | `components/jtts/src/sano_synth.cpp` |
+| Reading → sanoTTS kana intermediate form | `components/jtts/src/sano_text.cpp` |
+| Rational-ratio sinc resampler | `components/jtts/src/resampler.cpp` |
+| mmap + registration of the weight / dictionary partitions | `main/sano_model.cpp` |
+| Streaming playback + lip sync | `main/sano_stream_player.cpp` |
+| Weight blob, NOTICE, model license | `assets/sanotts/` |
+
+Playback follows the same scheme as
+[SanoTTS-jp-M5StackCoreS3](https://github.com/nnn112358/SanoTTS-jp-M5StackCoreS3): one PSRAM
+buffer per utterance, and once the preroll (audio length × (1 − 1/xRT) + two chunks) has
+accumulated, both "what is buffered" and "all the rest" are queued, after which synthesis
+only has to keep writing ahead of playback. Lip sync takes a 16 ms peak envelope, normalises
+it against the loudest window of the utterance, and updates the mouth every 10 ms from the
+estimated playback position.
+
+### Measured on a CoreS3 (arena in PSRAM)
+
+| Metric | Value |
+|---|---|
+| Steady-state xRT (synthesis time / audio length) | 1.7 |
+| Time to first sound (2.5 s utterance) | 3.3 s (57 % preroll) |
+| Dropouts | 0 |
+| Output PCM FNV-1a | `0xa69a7ebbb5ccb05f` — matches the upstream sanoTTS-jp reference |
+
+The 176 KB arena goes to PSRAM by default. `CONFIG_JTTS_SANO_ARENA_INTERNAL` prefers internal
+DRAM and is faster, but this build has no room for it (upstream's face-less configuration
+reaches xRT 0.45).
+
+## Hardware
+
+- M5Stack CoreS3 (ESP32-S3, 8 MB Quad-SPI PSRAM, 16 MB flash)
+- Stack-chan base: PY32 IO expander @ 0x6F, two SCS0009 servos (UART1 TX G6 / RX G7, 1 Mbps),
+  Si12T head touch sensor @ 0x68
+  - On a Takao base the servos hang off Port A (TX G2 / RX G1, half duplex) and servo power
+    is external
+  - Yaw ID 1 / pitch ID 2, 1 step ≈ 0.3125°
+- AtomS3R / AtomS3 / StopWatch still build, but sanoTTS needs 16 MB flash plus PSRAM, so it is
+  a CoreS3 feature
+
+## Other additions
+
+- **`purin` face preset** based on aNo-Lab's
+  "[プリンを守る技術](https://github.com/anoken/purin_wo_mamoru_gijutsu/)"
+  ([assets/purin_face.avdsl](assets/purin_face.avdsl)). Switch from the settings page or with
+  `POST /api/avatar-dsl`; the built-in default is selected by `CONFIG_AVATAR_DEFAULT_FACE`
+- **Startup sound**: do-re-mi-fa-so (C5–D5–E5–F5–G5), **off by default**, played as a faded
+  sine so it does not distort
 
 ## License
 
-First-party sources (`components/board`, `components/scs_servo`,
-`components/avatar`, `components/avatar_vm`, `components/jtts`,
-`components/conversation`, `components/config_service`,
-`components/wifi_config_service`, `components/telegram`, `main`, `tools`)
-are released under the **Boost Software License 1.0** ([LICENSE](LICENSE)).
+Sources in this repository are under the **Boost Software License 1.0**
+([LICENSE](LICENSE)), same as upstream. The additions bring in these third-party works:
 
-The submodules (`components/M5GFX`, `components/M5Unified`,
-`components/tl_expected/expected`) and managed_components
-(`espressif/esp_audio_codec`, `espressif/esp_websocket_client`,
-`espressif/mdns`, `espressif/esp_jpeg`, `espressif/esp32-camera`, etc.)
-keep their respective upstream licenses.
+| | License |
+|---|---|
+| sanoTTS-jp inference core (`components/saanotts_core`) | MIT (© 2026 yousan) |
+| **Model weights** `assets/sanotts/saanotts-jp-v3-int8.bin` | **sanoTTS-jp Model License 1.0** |
+| Open JTalk (`components/saanotts_core/openjtalk`) | Modified BSD |
+| Dictionary `k1-dict-438750.bin` (not bundled) | Modified BSD (from NAIST-jdic / UniDic) |
+
+> ⚠️ **A flashed image contains the model weights.** When redistributing, ship
+> [assets/sanotts/NOTICE.md](assets/sanotts/NOTICE.md) with it and pass on both the
+> **attribution** and the **restrictions on generated audio** (it may not be used to attack or
+> criticise individuals or groups, for political or religious advocacy, for adult content, or
+> redistributed as voice material — conditions inherited from the Tsukuyomi-chan corpus).
+
+Attribution for every third-party component is collected in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Acknowledgements
+
+- [ayutaz/sanoTTS-jp](https://github.com/ayutaz/sanoTTS-jp) — the model and the inference core
+- [nnn112358/SanoTTS-jp-M5StackCoreS3](https://github.com/nnn112358/SanoTTS-jp-M5StackCoreS3) — the CoreS3 port whose speaker / dictionary / lip-sync design this build follows
+- [ciniml/stackchan-idf](https://github.com/ciniml/stackchan-idf) — the base firmware
+- [anoken/purin_wo_mamoru_gijutsu](https://github.com/anoken/purin_wo_mamoru_gijutsu/) — the design behind the `purin` face preset
