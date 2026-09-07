@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 nnn112358 <neko112358@gmail.com>
+// SPDX-FileCopyrightText: 2026 @nnn112358
 // SPDX-License-Identifier: BSL-1.0
 //
 // 有理比 (L/M) の窓付き sinc リサンプラ。sanoTTS の 22.05 kHz 出力を jtts の出力レート

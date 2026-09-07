@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 nnn112358 <neko112358@gmail.com>
+// SPDX-FileCopyrightText: 2026 @nnn112358
 // SPDX-License-Identifier: BSL-1.0
 //
 // sanoTTS-jp の重み blob (assets/sanotts/saanotts-jp-v3-int8.bin) のロード。
