@@ -113,6 +113,37 @@ curl http://<device>/api/sano-model    # {"loaded":true,"dict":true,"capacity":6
 ときは USB でフル書き込み**が要ります。辞書は容量が大きいため git に入れず、
 `tools/get-sano-dict.sh` で取得します。
 
+## このフォークで削除したもの
+
+**上流のソースは 1 つも消していません。** 削除は「flash に載せる中身」と「既定値」だけです。
+
+### 通常ビルド (`cores3`) で削ったもの
+
+| 削ったもの | 理由 / 影響 |
+|---|---|
+| esp-sr モデル領域 2.9 MB → **1.9 MB** | sanoTTS の重み用に 1 MB を譲った。オフセットは据え置きなので書き込み済みモデルはそのまま有効。日本語ウェイクワード 1 語 (`srmodels.bin` 約 290 KB) には十分 |
+| 起動時の 440 Hz 診断音 | 16 kHz 再生経路のブリングアップ用に毎回鳴っていたビープ。既定で鳴らさない (`kBootPlayRawProbe`) |
+| 起動音 (アルペジオ) の既定 ON | 既定 OFF に変更。設定ページ / BLE で ON にできる |
+
+機能そのものは何も外していません (会話・OTA・カメラ・ASR・HMM・ESP-NOW すべて動きます)。
+
+### 辞書入りビルド (`cores3-dict`) で外したもの
+
+辞書 13.7 MB を載せるため、flash を単一アプリ 2.19 MiB に切り詰めた結果です。
+
+| 外した機能 | 影響する API |
+|---|---|
+| OTA (アプリ 2 面 → 1 面) | `/api/ota/*`、`/api/release/versions` |
+| AI 音声対話 (OpenAI / Gemini / XiaoZhi) | 会話タブ、barge-in |
+| BLE / Wi-Fi オーディオ ストリーム (AAC コーデック込み) | RTP 受信、BLE 音声 |
+| カメラ (GC0308) と QR | `/api/camera/*` |
+| オンデバイス ASR (esp-sr WakeNet) | ウェイクワード起動 |
+| HMM 合成 (hts_engine) と音声 DB | `/api/hmm-voice/*`、`/api/voice-db`、`/api/voices` |
+| ESP-NOW リモコン | ESP-NOW の動作モード |
+| 日本語フォント 12 / 20 / 24 px | 表示は 16 px に統一 (約 570 KB 節約) |
+
+顔・サーボ・Wi-Fi 設定ページ・BLE 設定・LT タイマー・ダンス・sanoTTS は残っています。
+
 ## 仕組み
 
 | 追加した部分 | 場所 |

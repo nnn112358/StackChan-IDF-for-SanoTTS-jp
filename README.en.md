@@ -117,6 +117,37 @@ The partition tables are [partitions_16mb.csv](partitions_16mb.csv) and
 needs a full USB flash**. The dictionary is too large for git; fetch it with
 `tools/get-sano-dict.sh`.
 
+## What this fork removes
+
+**No upstream source file was deleted.** What is removed is flash content and a few defaults.
+
+### Removed from the regular build (`cores3`)
+
+| Removed | Reason / impact |
+|---|---|
+| esp-sr model partition 2.9 MB → **1.9 MB** | 1 MB handed over to the sanoTTS weights. The offset is unchanged, so an already-flashed model still works, and one Japanese wake word (`srmodels.bin`, ~290 KB) fits comfortably |
+| The 440 Hz boot probe tone | A bring-up beep for the 16 kHz playback path that used to sound on every boot. Off by default now (`kBootPlayRawProbe`) |
+| Startup arpeggio defaulting to on | Now off by default; re-enable from the settings page or over BLE |
+
+No feature is dropped here — conversation, OTA, camera, ASR, HMM and ESP-NOW all still work.
+
+### Dropped from the dictionary build (`cores3-dict`)
+
+The 13.7 MB dictionary leaves room for only a single 2.19 MiB app, so these go:
+
+| Dropped feature | Affected API |
+|---|---|
+| OTA (two app slots → one) | `/api/ota/*`, `/api/release/versions` |
+| AI voice conversation (OpenAI / Gemini / XiaoZhi) | conversation tab, barge-in |
+| BLE / Wi-Fi audio streaming (and the AAC codec) | RTP receive, BLE audio |
+| Camera (GC0308) and QR scanning | `/api/camera/*` |
+| On-device ASR (esp-sr WakeNet) | wake-word activation |
+| HMM synthesis (hts_engine) and the unit voice DB | `/api/hmm-voice/*`, `/api/voice-db`, `/api/voices` |
+| ESP-NOW remote control | the ESP-NOW operation modes |
+| Japanese fonts at 12 / 20 / 24 px | everything renders at 16 px (~570 KB saved) |
+
+The face, servos, Wi-Fi settings page, BLE settings, LT timer, dance and sanoTTS all remain.
+
 ## How it works
 
 | Added part | Location |
