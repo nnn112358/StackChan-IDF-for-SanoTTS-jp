@@ -124,12 +124,9 @@ curl http://<device>/api/sano-model    # {"loaded":true,"dict":true,"capacity":6
 | **話速の補正** | `CONFIG_JTTS_SANO_SPEED_PCT` (既定 125 = 継続長 1.25 倍)。モデルが速めなので既定でゆっくりに |
 | **`POST /api/servo-pose`** | 首の姿勢を度で直接指定。発話の前後におじぎ・首振りをさせる入口 |
 | **顔プリセット `purin`** | aNo研「[プリンを守る技術](https://github.com/anoken/purin_wo_mamoru_gijutsu/)」ベースの顔 ([assets/purin_face.avdsl](assets/purin_face.avdsl))。設定ページのプリセット / `POST /api/avatar-dsl` で切り替え、組み込みデフォルトは `CONFIG_AVATAR_DEFAULT_FACE` |
-| **起動音** | ドレミファソ (C5–D5–E5–F5–G5)、既定 OFF。フェード付き正弦波で歪みを避ける |
 
 ## このフォークで無効化したもの
 
-**上流のソースは 1 つも消していません。** 変えたのは「flash に載せる中身」と「既定値」だけで、
-ビルド設定を戻せばどれも復活します。
 
 ### 通常ビルド (`cores3`) で無効化したもの
 
