@@ -186,6 +186,28 @@ std::uint16_t read_speaker_volume_pct()
 // gate) and the settings-page test-speak buttons (BLE chr + /api/jtts-say,
 // HTTP-auth gate). Returns immediately; the heap-owned string is freed
 // either by the worker or on task-create failure here.
+// 吹き出し用の表示文: 読みから sanoTTS / jtts のアクセント記号だけを落とす
+// ("きょ][おわよ][いて][んきです°ね" → "きょおわよいてんきですね")。
+std::string display_text_from_reading(std::string_view reading)
+{
+    std::string out;
+    out.reserve(reading.size());
+    for (std::size_t i = 0; i < reading.size(); ++i) {
+        const char c = reading[i];
+        if (c == '[' || c == ']' || c == '#' || c == '^' || c == '$' || c == '_' || c == '\'' || c == '/') {
+            continue;
+        }
+        // U+00B0 '°' (C2 B0)
+        if (static_cast<unsigned char>(c) == 0xC2 && i + 1 < reading.size() &&
+            static_cast<unsigned char>(reading[i + 1]) == 0xB0) {
+            ++i;
+            continue;
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+
 void start_say_worker(std::string_view kana_utf8)
 {
     auto* owned = new std::string{kana_utf8};
@@ -211,12 +233,21 @@ void start_say_worker(std::string_view kana_utf8)
             stackchan::jtts::Options opt = g_say_opts_ready
                 ? g_say_opts
                 : stackchan::app::resolve_speech_options("", stackchan::app::Speech::kSampleRate);
+            // 発声している文を吹き出しに出す (鳴り終わるまで保持、終わったら消す)。
+            const std::string display = display_text_from_reading(*kana_text);
+            if (g_state != nullptr && !display.empty()) {
+                g_state->set_balloon_text(display, /*hold_ms=*/UINT32_MAX);
+            }
+            auto finish = [] {
+                if (g_state != nullptr) g_state->clear_balloon();
+                stackchan::wifi_config::mcp_events::publish_say_done();
+                vTaskDeleteWithCaps(nullptr);
+            };
             // sanoTTS はストリーミング (合成しながら再生 + リップシンク)。モデル無し /
             // 読めない / 長すぎるときは false なので、従来の一括経路 (他エンジン) に落とす。
             if ((opt.engine == stackchan::jtts::Engine::Auto || opt.engine == stackchan::jtts::Engine::Sano) &&
                 stackchan::app::speak_streaming(kana, opt, g_state)) {
-                stackchan::wifi_config::mcp_events::publish_say_done();
-                vTaskDeleteWithCaps(nullptr);
+                finish();
                 return;
             }
             std::uint32_t rate = opt.sample_rate_hz;  // sanoTTS は 22.05 kHz を返す
@@ -224,11 +255,11 @@ void start_say_worker(std::string_view kana_utf8)
             if (auto r = stackchan::jtts::synthesize(kana, pcm, opt, &rate); !r) {
                 ESP_LOGW(kTag, "say synth fail: %s",
                          stackchan::jtts::to_string(r.error()));
-                vTaskDeleteWithCaps(nullptr);
+                finish();
                 return;
             }
             if (pcm.empty()) {
-                vTaskDeleteWithCaps(nullptr);
+                finish();
                 return;
             }
             // Lip sync: drive the avatar mouth from the clip's envelope while it
@@ -250,8 +281,7 @@ void start_say_worker(std::string_view kana_utf8)
                 vTaskDelay(pdMS_TO_TICKS(10));
             }
             if (g_state != nullptr) g_state->face.mouth_open.store(0.0f, std::memory_order_relaxed);
-            stackchan::wifi_config::mcp_events::publish_say_done();
-            vTaskDeleteWithCaps(nullptr);
+            finish();
         },
         // Pin to CPU 0 — CPU 1 hosts speaker/mic/render/servo and a
         // 12 KiB stack alloc here starves render (observed 2026-06-07).
