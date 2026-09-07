@@ -495,7 +495,9 @@ extern "C" void app_main()
     // contention instead). If this probe is also silent while the
     // arpeggio (48 kHz tone) was audible, the codec / I2S clock chain
     // doesn't like the 16 kHz fs.
-    {
+    // Bring-up diagnostic: follows the startup-sound setting so a user who
+    // silenced the arpeggio doesn't still get a loud 440 Hz beep at boot.
+    if (cfg.startup_arpeggio_enabled) {
         constexpr std::uint32_t kProbeRate = 16'000;
         constexpr std::size_t kProbeSamples = kProbeRate * 300 / 1000; // 300 ms
         static std::int16_t probe_pcm[kProbeSamples];
