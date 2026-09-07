@@ -19,6 +19,17 @@ config JTTS_ENABLE_SANO
         合成の作業領域 176 KB は既定で PSRAM (JTTS_SANO_ARENA_INTERNAL 参照)。
         無効時は render_sano がスタブになり推論コアはリンクされない。
 
+config JTTS_SANO_SPEED_PCT
+    int "sanoTTS: duration scale correction [%] (100 = model default, larger = slower)"
+    default 125
+    range 50 200
+    depends on JTTS_ENABLE_SANO
+    help
+        sanoTTS-jp の学習モデルはそのままだと話速が速めなので、音素の継続長
+        (duration scale s_v) に掛ける補正。125 なら継続長 1.25 倍 = 約 20% ゆっくり。
+        ピッチは変わらない。jtts 設定の mora_ms (既定 110 = 等速) はこの上に相対で効く。
+        上流 (SanoTTS-jp-M5StackCoreS3) との checksum 突き合わせは 100 + mora_ms 110 で行う。
+
 config JTTS_SANO_ARENA_INTERNAL
     bool "sanoTTS: try internal DRAM for the 176 KB synthesis arena"
     default n

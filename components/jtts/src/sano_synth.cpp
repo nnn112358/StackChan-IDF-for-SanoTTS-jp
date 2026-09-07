@@ -91,6 +91,13 @@ constexpr std::size_t kMaxSamples = static_cast<std::size_t>(SAAN_SR) * 30u;
 // mora_ms (既定 110 ms = 等速) → duration scale の倍率。HMM エンジンと同じ範囲。
 constexpr float kBaseMoraMs = 110.0f;
 constexpr float kTempoMin = 0.5f, kTempoMax = 2.0f;
+// 学習モデルの話速が速めなので継続長に掛ける一律の補正 (CONFIG_JTTS_SANO_SPEED_PCT、
+// 既定 125%)。ホスト ビルド (テスト / 上流 checksum の突き合わせ) は 100%。
+#if defined(CONFIG_JTTS_SANO_SPEED_PCT)
+constexpr float kSpeedCorrection = static_cast<float>(CONFIG_JTTS_SANO_SPEED_PCT) / 100.0f;
+#else
+constexpr float kSpeedCorrection = 1.0f;
+#endif
 
 // 音量: 上流 SanoTTS-jp-M5StackCoreS3 と同じく**正規化しない** (デモ文で |max| ≈ 0.29、
 // 音量 128 で CoreS3 の内蔵スピーカーが歪まないレベル)。opt.gain は既定 0.6 に対する
@@ -179,7 +186,7 @@ bool text_to_ids(std::u32string_view text, std::vector<std::int32_t>& ids) {
 }
 
 float tempo_scale(float mora_ms) {
-    return std::clamp(mora_ms / kBaseMoraMs, kTempoMin, kTempoMax);
+    return std::clamp(mora_ms / kBaseMoraMs, kTempoMin, kTempoMax) * kSpeedCorrection;
 }
 
 struct Synthesized {
