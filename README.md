@@ -138,6 +138,11 @@ curl http://<device>/api/sano-model    # {"loaded":true,"dict":true,"capacity":6
 
 機能そのものは何も無効化していません (会話・OTA・カメラ・ASR・HMM・ESP-NOW すべて動きます)。
 
+ただし **`engine: "auto"` の優先順位が変わりました**: sanoTTS → HMM → 単位連結 → フォルマント。
+sanoTTS のモデルは同梱・書き込み済みなので、通常ビルドでも**既定では HMM や音声 DB の声は
+選ばれません** (HMM ボイスと `voice` パーティション 4 MB はそのまま残っています)。従来の声に
+戻すには `POST /api/jtts-config` で `{"engine":"hmm"}` のように明示します。
+
 ### 辞書入りビルド (`cores3-dict`) で無効化したもの
 
 辞書 13.7 MB を載せるため、flash を単一アプリ 2.19 MiB に切り詰めた結果です。
@@ -149,7 +154,7 @@ curl http://<device>/api/sano-model    # {"loaded":true,"dict":true,"capacity":6
 | BLE / Wi-Fi オーディオ ストリーム (AAC コーデック込み) | RTP 受信、BLE 音声 |
 | カメラ (GC0308) と QR | `/api/camera/*` |
 | オンデバイス ASR (esp-sr WakeNet) | ウェイクワード起動 |
-| HMM 合成 (hts_engine) と音声 DB | `/api/hmm-voice/*`、`/api/voice-db`、`/api/voices` |
+| HMM 合成 (hts_engine)、単位連結の音声 DB、`voice` パーティション 4 MB | `/api/hmm-voice/*`、`/api/voice-db`、`/api/voices` |
 | ESP-NOW リモコン | ESP-NOW の動作モード |
 | 日本語フォント 12 / 20 / 24 px | 表示は 16 px に統一 (約 570 KB 節約) |
 

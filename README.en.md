@@ -145,6 +145,12 @@ every item below comes back by flipping the build configuration.
 
 No feature is disabled here — conversation, OTA, camera, ASR, HMM and ESP-NOW all still work.
 
+The **`engine: "auto"` priority did change**, though: sanoTTS → HMM → unit-concatenative →
+formant. The sanoTTS model ships with the firmware and is always flashed, so **the HMM and
+unit voices are no longer selected by default** even on the regular build (the HMM voice and
+its 4 MB `voice` partition are still there). Ask for the old behaviour explicitly with
+`POST /api/jtts-config` and `{"engine":"hmm"}`.
+
 ### Disabled in the dictionary build (`cores3-dict`)
 
 The 13.7 MB dictionary leaves room for only a single 2.19 MiB app, so these are switched off:
@@ -156,7 +162,7 @@ The 13.7 MB dictionary leaves room for only a single 2.19 MiB app, so these are 
 | BLE / Wi-Fi audio streaming (and the AAC codec) | RTP receive, BLE audio |
 | Camera (GC0308) and QR scanning | `/api/camera/*` |
 | On-device ASR (esp-sr WakeNet) | wake-word activation |
-| HMM synthesis (hts_engine) and the unit voice DB | `/api/hmm-voice/*`, `/api/voice-db`, `/api/voices` |
+| HMM synthesis (hts_engine), the unit voice DB, and the 4 MB `voice` partition | `/api/hmm-voice/*`, `/api/voice-db`, `/api/voices` |
 | ESP-NOW remote control | the ESP-NOW operation modes |
 | Japanese fonts at 12 / 20 / 24 px | everything renders at 16 px (~570 KB saved) |
 
