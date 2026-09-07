@@ -5,7 +5,7 @@
 // C99 推論コアを jtts::Engine::Sano として使う。
 //
 //   かな (jtts 表記) ──▶ かな中間表現 (sano_text.cpp) ──▶ saan_g2p ──▶ ids
-//     ──▶ saan_stream_init / pull (22.05 kHz float) ──▶ ピーク正規化
+//     ──▶ saan_stream_init / pull (22.05 kHz float) ──▶ gain (既定 ×1.0)
 //     ──▶ リサンプル (resampler.cpp) ──▶ int16 @ opt.sample_rate_hz
 //
 // 発話は**全部合成してから**返す (Speech::say がそのまま playRaw + 包絡を作るので、
@@ -91,21 +91,10 @@ constexpr std::size_t kMaxSamples = static_cast<std::size_t>(SAAN_SR) * 30u;
 constexpr float kBaseMoraMs = 110.0f;
 constexpr float kTempoMin = 0.5f, kTempoMax = 2.0f;
 
-// 音量: ラウドネス正規化 + ソフト リミッタ。
-//   CoreS3 の内蔵スピーカー (AW88298、M5Unified はブースト無効) は、ピークがおよそ 0.3
-//   (上流 SanoTTS-jp-M5StackCoreS3 の実測 |max| 0.29、音量 128) を超えるとアンプ側で
-//   割れる (2026-09-07 実機: ピーク 0.9 / 音量 100% でも、0.3 / 150% でも割れた)。
-//   一方、音声は波高率が高い (ピーク 0.4 に対し RMS 0.07) ので、ピークを 0.3 に抑えた
-//   ままでは小さく聞こえる。そこで RMS を kRmsTarget に合わせるゲインを掛け、
-//   kKnee を超えるピークだけ tanh でなだらかに kPeakTarget に収める (瞬間的な
-//   子音のピークが少し丸まるだけで、アンプのハード クリップより遥かに聞きやすい)。
-//   opt.gain は既定 0.6 に対する相対倍率として RMS 目標に掛かる。
-constexpr float kPeakTarget = 0.30f;   // リミッタの漸近ピーク (アンプが歪まない上限)
-constexpr float kKnee = 0.20f;         // ここまでは無加工 (線形)
-constexpr float kRmsTarget = 0.12f;    // 既定 gain (0.6) のときの目標 RMS (上流の約 2 倍 = +6 dB)
+// 音量: 上流 SanoTTS-jp-M5StackCoreS3 と同じく**正規化しない** (デモ文で |max| ≈ 0.29、
+// 音量 128 で CoreS3 の内蔵スピーカーが歪まないレベル)。opt.gain は既定 0.6 に対する
+// 相対倍率としてだけ掛ける (既定 = ×1.0 = 素通し)。
 constexpr float kDefaultGain = 0.6f;
-constexpr float kMaxGainBoost = 6.0f;  // 無音に近い出力を増幅しすぎない
-constexpr float kSilencePeak = 1e-4f;
 
 // ---- モデル ---------------------------------------------------------------
 
@@ -195,7 +184,6 @@ float tempo_scale(float mora_ms) {
 struct Synthesized {
     std::vector<float> pcm;  // 22.05 kHz、[-1, 1]
     float peak = 0.0f;
-    double sq_sum = 0.0;     // Σx² (RMS 用)
     std::int32_t n_frames = 0;
     // 正規化前の int16 (lrintf(x × 32767)) の FNV-1a 64 bit。上流 sanoTTS-jp の
     // QEMU / 実機記録と突き合わせるための移植検証値 (デモ文 "きょ][おわよ][いて][んきです°ね"、
@@ -249,7 +237,6 @@ bool synthesize_pcm(const std::vector<std::int32_t>& ids, float s_v, Synthesized
         const auto ns = static_cast<std::ptrdiff_t>(n) * SAAN_HOP;
         for (std::ptrdiff_t i = 0; i < ns; ++i) {
             out.peak = std::max(out.peak, std::fabs(chunk[i]));
-            out.sq_sum += static_cast<double>(chunk[i]) * chunk[i];
             // 上流 saan_f32_to_i16 と同じ変換・同じハッシュ (FNV-1a、LE 2 バイト)
             long v = std::lrint(chunk[i] * 32767.0f);
             if (v > 32767) v = 32767;
@@ -264,30 +251,6 @@ bool synthesize_pcm(const std::vector<std::int32_t>& ids, float s_v, Synthesized
 #endif
     }
     return true;
-}
-
-// RMS を目標に合わせる倍率。ピークはこの後のソフト リミッタが kPeakTarget に収める。
-float loudness_scale(const Synthesized& s, float gain) {
-    if (s.peak <= kSilencePeak || s.pcm.empty()) return 1.0f;
-    const float rms = static_cast<float>(std::sqrt(s.sq_sum / static_cast<double>(s.pcm.size())));
-    if (rms <= kSilencePeak) return 1.0f;
-    const float target = kRmsTarget * gain / kDefaultGain;
-    return std::min(target / rms, kMaxGainBoost);
-}
-
-// ソフト リミッタ: |x| ≤ kKnee は素通し、それ以上は tanh で kPeakTarget に漸近させる。
-// 連続 (kKnee で値と傾きが一致) なので折れ点の歪みは出ない。
-void soft_limit(std::vector<float>& pcm, float scale) {
-    constexpr float kRange = kPeakTarget - kKnee;
-    for (float& v : pcm) {
-        float x = v * scale;
-        const float a = std::fabs(x);
-        if (a > kKnee) {
-            const float y = kKnee + kRange * std::tanh((a - kKnee) / kRange);
-            x = (x < 0.0f) ? -y : y;
-        }
-        v = x;
-    }
 }
 
 internal::SincResampler g_resampler;
@@ -316,10 +279,9 @@ bool render_sano(std::u32string_view text, std::vector<std::int16_t>& out, const
         SANO_LOGW("unsupported output rate %u", static_cast<unsigned>(out_rate));
         return false;
     }
-    const float scale = loudness_scale(synth, opt.gain);
-    soft_limit(synth.pcm, scale);  // ゲインとリミッタを float のうちに掛ける
+    const float scale = opt.gain / kDefaultGain;  // 既定 gain なら素通し
     const std::size_t out_before = out.size();
-    g_resampler.run(synth.pcm.data(), synth.pcm.size(), 1.0f, out);
+    g_resampler.run(synth.pcm.data(), synth.pcm.size(), scale, out);
     const auto t2 = std::chrono::steady_clock::now();
 
     const auto ms = [](auto d) {

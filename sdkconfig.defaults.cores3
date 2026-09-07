@@ -110,3 +110,7 @@ CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=4
 # パーティション (1 MB) に `make flash` が書く。作業領域 176 KB は PSRAM
 # (CONFIG_JTTS_SANO_ARENA_INTERNAL は OFF のまま — 内部 RAM は WiFi/BLE/esp-sr で逼迫)。
 CONFIG_JTTS_ENABLE_SANO=y
+
+# AW88298 のブーストは M5Unified 既定 (Transparent) のまま = 参照プロジェクト
+# (SanoTTS-jp-M5StackCoreS3) と同じスピーカー設定。試すなら 5000〜10250 [mV]。
+CONFIG_STACKCHAN_CORES3_SPK_BOOST_MV=0

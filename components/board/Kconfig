@@ -73,7 +73,7 @@ menu "Stack-chan board"
 
     config STACKCHAN_CORES3_SPK_BOOST_MV
         int "CoreS3 speaker amp (AW88298) boost voltage [mV] (0 = off)"
-        default 5000
+        default 0
         range 0 10250
         help
             CoreS3 内蔵アンプ AW88298 の Smart Boost 2 モードの最大出力電圧 [mV]
